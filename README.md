@@ -10,6 +10,7 @@ Este proyecto es un sitio web para la Iglesia Lugar de Refugio, desarrollado con
 - Blog con publicaciones
 - Página de contacto
 - Panel de administración para gestionar contenido
+- Persistencia de datos usando localStorage
 
 ## Tecnologías utilizadas
 
