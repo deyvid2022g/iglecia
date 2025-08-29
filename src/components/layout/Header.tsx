@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, User, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { AnimatedLogo } from '../AnimatedLogo';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -59,16 +60,7 @@ export function Header() {
             className="flex items-center space-x-3 focus-ring"
             aria-label="Lugar de Refugio - Inicio"
           >
-            <img 
-              src="/trabajo.png" 
-              alt="Lugar de Refugio" 
-              className="w-8 h-8 object-contain"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.onerror = null;
-                target.style.display = 'none';
-              }}
-            />
+            <AnimatedLogo className="w-8 h-8" />
             <span className="hidden sm:block font-semibold text-lg">
               Lugar de Refugio
             </span>

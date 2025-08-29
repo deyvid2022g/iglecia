@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   Calendar,
@@ -11,8 +11,18 @@ import {
   ChevronLeft,
   ExternalLink,
   Check,
-  AlertCircle
+  AlertCircle,
+  Heart,
+  MessageCircle
 } from 'lucide-react';
+
+// Definir interfaz para los comentarios
+interface Comment {
+  id: number;
+  author: string;
+  content: string;
+  date: string;
+}
 
 export function EventDetailPage() {
   const { slug } = useParams();
@@ -25,6 +35,13 @@ export function EventDetailPage() {
     guests: 1,
     specialRequests: ''
   });
+  
+  // Estado para los comentarios y likes
+  const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
 
   // Simulated event data - in real app this would come from an API
   const event = {
@@ -103,6 +120,50 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
     return colors[type] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
+  // Inicializar likes y comentarios
+  useEffect(() => {
+    // Simular datos iniciales
+    setLikesCount(15);
+    setComments([
+      { id: 1, author: 'Carlos Mendoza', content: 'Excelente evento, ¡no puedo esperar para asistir!', date: '2025-01-15T14:30:00' },
+      { id: 2, author: 'Laura Gómez', content: 'El taller del año pasado fue increíble, seguro este será aún mejor.', date: '2025-01-16T09:20:00' },
+    ]);
+  }, []);
+
+  // Función para añadir un nuevo comentario
+  const addComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newComment.trim() === '') return;
+    
+    const newCommentObj = {
+      id: comments.length + 1,
+      author: 'Usuario',
+      content: newComment,
+      date: new Date().toISOString()
+    };
+    
+    setComments([...comments, newCommentObj]);
+    setNewComment('');
+  };
+
+  // Función para compartir el evento
+  const shareEvent = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: event.title,
+          text: `${event.title} - ${formatDate(event.date)}`,
+          url: window.location.href
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Enlace copiado al portapapeles');
+      }
+    } catch (error) {
+      console.error('Error al compartir:', error);
+    }
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate form submission
@@ -117,20 +178,6 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
       ...formData,
       [e.target.name]: e.target.value
     });
-  };
-
-  const shareEvent = async () => {
-    if (navigator.share) {
-      await navigator.share({
-        title: event.title,
-        text: event.description,
-        url: window.location.href
-      });
-    } else {
-      // Fallback: copy to clipboard
-      await navigator.clipboard.writeText(window.location.href);
-      alert('Enlace copiado al portapapeles');
-    }
   };
 
   const addToCalendar = () => {
@@ -427,6 +474,83 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sección de interacción social */}
+      <div className="bg-gray-50 py-8">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Interacción</h2>
+              <div className="flex space-x-4">
+                <button 
+                  onClick={() => {
+                    setLiked(!liked);
+                    setLikesCount(liked ? likesCount - 1 : likesCount + 1);
+                  }}
+                  className={`flex items-center ${liked ? 'text-red-500' : 'text-gray-600'} hover:text-red-500 transition-colors focus-ring`}
+                >
+                  <Heart className="w-5 h-5 mr-2" fill={liked ? 'currentColor' : 'none'} />
+                  <span>{likesCount} Me gusta</span>
+                </button>
+                <button 
+                  onClick={() => setShowComments(!showComments)}
+                  className="flex items-center text-gray-600 hover:text-blue-500 transition-colors focus-ring"
+                >
+                  <MessageCircle className="w-5 h-5 mr-2" />
+                  <span>{comments.length} Comentarios</span>
+                </button>
+                <button
+                  onClick={shareEvent}
+                  className="flex items-center text-gray-600 hover:text-black transition-colors focus-ring"
+                >
+                  <Share2 className="w-5 h-5 mr-2" />
+                  Compartir
+                </button>
+              </div>
+            </div>
+            
+            {/* Sección de comentarios */}
+            {showComments && (
+              <section className="bg-white rounded-lg border p-6">
+                <h3 className="text-xl font-semibold mb-6">Comentarios ({comments.length})</h3>
+                
+                <div className="space-y-6 mb-8">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="font-medium">{comment.author}</div>
+                        <div className="text-sm text-gray-500">{new Date(comment.date).toLocaleDateString()}</div>
+                      </div>
+                      <p className="text-gray-700">{comment.content}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                <form onSubmit={addComment} className="mt-8">
+                  <div className="mb-4">
+                    <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">Añadir comentario</label>
+                    <textarea
+                      id="comment"
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Escribe tu comentario aquí..."
+                      required
+                    ></textarea>
+                  </div>
+                  <button 
+                    type="submit" 
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  >
+                    Publicar comentario
+                  </button>
+                </form>
+              </section>
+            )}
           </div>
         </div>
       </div>

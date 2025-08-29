@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, Calendar, Heart, ArrowRight, Users, Baby, MapPin, Mail, Phone, Building } from 'lucide-react';
+import { HeroLogo } from '../components/HeroLogo';
 
 export function HomePage() {
   const [isVisible, setIsVisible] = useState(false);
@@ -126,6 +127,7 @@ export function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white"></div>
         <div className="relative container mx-auto px-4 sm:px-6">
           <div className="max-w-4xl mx-auto text-center">
+            <HeroLogo className="mb-6" />
             <h1 
               id="hero-title"
               className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-6 transition-all duration-700 ${

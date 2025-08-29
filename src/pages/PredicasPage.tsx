@@ -1,12 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Download, Share2, Clock, Tag, Search } from 'lucide-react';
+import { Play, Download, Share2, Clock, Tag, Search, Heart, MessageCircle } from 'lucide-react';
 
 export function SermonsPage() {
   // Renamed from SermonsPage but keeping the same function name for compatibility
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [selectedSpeaker, setSelectedSpeaker] = useState('');
+  // Define interfaces for sermon data
+  interface Sermon {
+    id: number;
+    slug: string;
+    title: string;
+    speaker: string;
+    date: string;
+    duration: string;
+    thumbnail: string;
+    description: string;
+    tags: string[];
+    videoUrl: string;
+    audioUrl: string;
+    hasTranscript: boolean;
+    viewCount: number;
+  }
+
+  // Define types for likes and comments
+  type LikesMap = Record<number, number>;
+  type CommentsMap = Record<number, number>;
+
+  const [sermonLikes, setSermonLikes] = useState<LikesMap>({});
+  const [sermonComments, setSermonComments] = useState<CommentsMap>({});
 
   const sermons = [
     {
@@ -96,6 +119,53 @@ export function SermonsPage() {
     setSearchTerm('');
     setSelectedTag('');
     setSelectedSpeaker('');
+  };
+  
+  // Initialize likes and comments
+  useEffect(() => {
+    // Initialize with random likes for each sermon
+    const initialLikes: LikesMap = {};
+    const initialComments: CommentsMap = {};
+    
+    sermons.forEach(sermon => {
+      initialLikes[sermon.id] = Math.floor(Math.random() * 50) + 10; // Random likes between 10-59
+      initialComments[sermon.id] = Math.floor(Math.random() * 10) + 1; // Random comments between 1-10
+    });
+    
+    setSermonLikes(initialLikes);
+    setSermonComments(initialComments);
+  }, []);
+  
+  // Function to handle liking a sermon
+  const handleLike = (sermonId: number) => {
+    setSermonLikes(prev => {
+      const currentLikes = prev[sermonId] || 0;
+      return {
+        ...prev,
+        [sermonId]: currentLikes + 1
+      };
+    });
+  };
+  
+  // Function to share a sermon
+  const shareSermon = (sermon: Sermon) => {
+    if (navigator.share) {
+      navigator.share({
+        title: sermon.title,
+        text: `Te recomiendo escuchar esta prédica: ${sermon.title} por ${sermon.speaker}`,
+        url: window.location.origin + '/predicas/' + sermon.slug
+      })
+      .catch((error) => console.log('Error compartiendo:', error));
+    } else {
+      // Fallback for browsers that don't support Web Share API
+      const dummyInput = document.createElement('input');
+      document.body.appendChild(dummyInput);
+      dummyInput.value = window.location.origin + '/predicas/' + sermon.slug;
+      dummyInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(dummyInput);
+      alert('Enlace copiado al portapapeles. ¡Compártelo con tus amigos!');
+    }
   };
 
   return (
@@ -253,6 +323,23 @@ export function SermonsPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
+                          onClick={() => handleLike(sermon.id)}
+                          className="p-2 text-gray-600 hover:text-red-500 hover:bg-gray-100 rounded-lg transition-colors focus-ring flex items-center"
+                          aria-label="Me gusta"
+                        >
+                          <Heart className="w-4 h-4 mr-1" />
+                          <span className="text-sm">{sermonLikes[sermon.id] || 0}</span>
+                        </button>
+                        <Link
+                          to={`/predicas/${sermon.slug}`}
+                          className="p-2 text-gray-600 hover:text-blue-500 hover:bg-gray-100 rounded-lg transition-colors focus-ring flex items-center"
+                          aria-label="Ver comentarios"
+                        >
+                          <MessageCircle className="w-4 h-4 mr-1" />
+                          <span className="text-sm">{sermonComments[sermon.id] || 0}</span>
+                        </Link>
+                        <button
+                          onClick={() => shareSermon(sermon)}
                           className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors focus-ring"
                           aria-label="Compartir sermón"
                         >

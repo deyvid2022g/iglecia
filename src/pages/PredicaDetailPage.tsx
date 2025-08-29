@@ -12,7 +12,9 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  Maximize
+  Maximize,
+  Heart,
+  MessageCircle
 } from 'lucide-react';
 
 export function SermonDetailPage() {
@@ -24,6 +26,11 @@ export function SermonDetailPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(45); // Initial likes count
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState('');
 
   // Simulated predica data - in real app this would come from an API
   const sermon = {
@@ -148,6 +155,49 @@ export function SermonDetailPage() {
       const totalSeconds = minutes * 60 + seconds;
       seekTo(totalSeconds);
     }
+  };
+  
+  // Function to share the sermon
+  const shareSermon = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: sermon.title,
+          text: `${sermon.title} - ${sermon.speaker}`,
+          url: window.location.href
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Enlace copiado al portapapeles');
+      }
+    } catch (error) {
+      console.error('Error al compartir:', error);
+    }
+  };
+  
+  // Initialize comments with dummy data
+  useEffect(() => {
+    setComments([
+      { id: 1, author: 'Carlos Mendoza', content: 'Esta prédica cambió mi perspectiva sobre la fe. Gracias pastor.', date: '2023-05-15T14:30:00' },
+      { id: 2, author: 'Laura Sánchez', content: 'Justo lo que necesitaba escuchar hoy. Dios habló a mi corazón.', date: '2023-05-16T09:20:00' },
+      { id: 3, author: 'Roberto Gómez', content: '¡Excelente mensaje! Lo compartiré con mi grupo familiar.', date: '2023-05-16T16:45:00' },
+    ]);
+  }, []);
+  
+  // Function to add a new comment
+  const addComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newComment.trim() === '') return;
+    
+    const newCommentObj = {
+      id: comments.length + 1,
+      author: 'Usuario',
+      content: newComment,
+      date: new Date().toISOString()
+    };
+    
+    setComments([...comments, newCommentObj]);
+    setNewComment('');
   };
 
   if (!sermon) {
@@ -312,7 +362,10 @@ export function SermonDetailPage() {
                     <Download className="w-4 h-4 mr-2" />
                     Descargar audio
                   </button>
-                  <button className="btn-secondary">
+                  <button 
+                    onClick={shareSermon}
+                    className="btn-secondary"
+                  >
                     <Share2 className="w-4 h-4 mr-2" />
                     Compartir
                   </button>
@@ -412,6 +465,78 @@ export function SermonDetailPage() {
               </div>
             </div>
           </div>
+          
+          {/* Social Interactions */}
+          <div className="container mx-auto px-4 sm:px-6 mt-8">
+            <div className="flex items-center space-x-6 border-t border-b py-4">
+              <button 
+                onClick={() => {
+                  setLiked(!liked);
+                  setLikesCount(liked ? likesCount - 1 : likesCount + 1);
+                }}
+                className={`flex items-center ${liked ? 'text-red-500' : 'text-gray-600'} hover:text-red-500 transition-colors focus-ring`}
+              >
+                <Heart className="w-5 h-5 mr-2" fill={liked ? 'currentColor' : 'none'} />
+                <span>{likesCount} Me gusta</span>
+              </button>
+              <button 
+                onClick={() => setShowComments(!showComments)}
+                className="flex items-center text-gray-600 hover:text-blue-500 transition-colors focus-ring"
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                <span>{comments.length} Comentarios</span>
+              </button>
+              <button
+                onClick={shareSermon}
+                className="flex items-center text-gray-600 hover:text-black transition-colors focus-ring"
+              >
+                <Share2 className="w-5 h-5 mr-2" />
+                Compartir
+              </button>
+            </div>
+          </div>
+          
+          {/* Comments Section */}
+          {showComments && (
+            <div className="container mx-auto px-4 sm:px-6 mt-8">
+              <section className="bg-white rounded-lg border p-6">
+                <h3 className="text-xl font-semibold mb-6">Comentarios ({comments.length})</h3>
+                
+                <div className="space-y-6 mb-8">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="font-medium">{comment.author}</div>
+                        <div className="text-sm text-gray-500">{new Date(comment.date).toLocaleDateString()}</div>
+                      </div>
+                      <p className="text-gray-700">{comment.content}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                <form onSubmit={addComment} className="mt-8">
+                  <div className="mb-4">
+                    <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">Añadir comentario</label>
+                    <textarea
+                      id="comment"
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Escribe tu comentario aquí..."
+                      required
+                    ></textarea>
+                  </div>
+                  <button 
+                    type="submit" 
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  >
+                    Publicar comentario
+                  </button>
+                </form>
+              </section>
+            </div>
+          )}
         </div>
       </div>
     </div>

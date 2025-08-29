@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Calendar as CalendarIcon, 
@@ -8,16 +8,96 @@ import {
   Filter,
   Search,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Heart,
+  MessageCircle,
+  Share2
 } from 'lucide-react';
+import { AnimatedCard } from '../components/AnimatedCard';
+
+// Definir tipos para los eventos
+interface Event {
+  id: number;
+  slug: string;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  type: string;
+  location: {
+    name: string;
+    address: string;
+  };
+  description: string;
+  capacity: number;
+  registrations: number;
+  image: string;
+  host: string;
+  requiresRSVP: boolean;
+}
+
+// Definir tipos para los likes y comentarios
+type LikesMap = Record<number, number>;
+type CommentsMap = Record<number, number>;
 
 export function EventsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedType, setSelectedType] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list');
+  
+  // Estado para los likes y comentarios
+  const [eventLikes, setEventLikes] = useState<LikesMap>({});
+  const [eventComments, setEventComments] = useState<CommentsMap>({});
 
   const eventTypes = ['Culto', 'Niños', 'Jóvenes', 'Grupo Pequeño', 'Evento Especial'];
+  
+  // Inicializar likes y comentarios
+  useEffect(() => {
+    // Simular datos iniciales
+    const initialLikes: LikesMap = {};
+    const initialComments: CommentsMap = {};
+    
+    events.forEach(event => {
+      initialLikes[event.id] = Math.floor(Math.random() * 50);
+      initialComments[event.id] = Math.floor(Math.random() * 10);
+    });
+    
+    setEventLikes(initialLikes);
+    setEventComments(initialComments);
+  }, []);
+  
+  // Función para manejar los likes
+  const handleLike = (eventId: number) => {
+    setEventLikes(prev => {
+      const currentLikes = prev[eventId] || 0;
+      return {
+        ...prev,
+        [eventId]: currentLikes + 1
+      };
+    });
+  };
+  
+  // Función para compartir un evento
+  const shareEvent = (event: Event) => {
+    if (navigator.share) {
+      navigator.share({
+        title: event.title,
+        text: `Te invito a este evento: ${event.title}`,
+        url: window.location.origin + '/eventos/' + event.slug
+      })
+      .catch((error) => console.log('Error compartiendo:', error));
+    } else {
+      // Fallback para navegadores que no soportan Web Share API
+      const dummyInput = document.createElement('input');
+      document.body.appendChild(dummyInput);
+      dummyInput.value = window.location.origin + '/eventos/' + event.slug;
+      dummyInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(dummyInput);
+      alert('Enlace copiado al portapapeles. ¡Compártelo con tus amigos!');
+    }
+  };
 
   const events = [
     {
@@ -276,8 +356,8 @@ export function EventsPage() {
             </div>
           ) : (
             <div className="space-y-8">
-              {filteredEvents.map((event) => (
-                <article key={event.id} className="card group">
+              {filteredEvents.map((event, index) => (
+                <AnimatedCard key={event.id} delay={index * 0.1} className="card group">
                   <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* Event Image */}
                     <div className="lg:col-span-1">
@@ -362,6 +442,33 @@ export function EventsPage() {
                         <button className="btn-secondary w-full">
                           Agregar al calendario
                         </button>
+                        
+                        {/* Botones de interacción social */}
+                        <div className="flex justify-between mt-4">
+                          <button
+                            onClick={() => handleLike(event.id)}
+                            className="p-2 text-gray-600 hover:text-red-500 hover:bg-gray-100 rounded-lg transition-colors focus-ring flex items-center"
+                            aria-label="Me gusta"
+                          >
+                            <Heart className="w-4 h-4 mr-1" />
+                            <span className="text-sm">{eventLikes[event.id] || 0}</span>
+                          </button>
+                          <Link
+                            to={`/eventos/${event.slug}`}
+                            className="p-2 text-gray-600 hover:text-blue-500 hover:bg-gray-100 rounded-lg transition-colors focus-ring flex items-center"
+                            aria-label="Ver comentarios"
+                          >
+                            <MessageCircle className="w-4 h-4 mr-1" />
+                            <span className="text-sm">{eventComments[event.id] || 0}</span>
+                          </Link>
+                          <button
+                            onClick={() => shareEvent(event)}
+                            className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors focus-ring"
+                            aria-label="Compartir evento"
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Capacity Indicator */}
@@ -383,7 +490,7 @@ export function EventsPage() {
                       )}
                     </div>
                   </div>
-                </article>
+                </AnimatedCard>
               ))}
             </div>
           )}

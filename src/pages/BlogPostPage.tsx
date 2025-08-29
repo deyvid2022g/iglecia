@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   Calendar, 
@@ -14,6 +14,19 @@ import {
 
 export function BlogPostPage() {
   const { slug } = useParams();
+  const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [showComments, setShowComments] = useState(false);
+  // Define interface for comment type
+  interface Comment {
+    id: number;
+    author: string;
+    content: string;
+    date: string;
+  }
+
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
 
   // Simulated blog post data - in real app this would come from an API
   const post = {
@@ -126,13 +139,41 @@ export function BlogPostPage() {
     if (navigator.share) {
       await navigator.share({
         title: post.title,
-        text: post.excerpt,
+        text: 'Te recomiendo leer este artículo: ' + post.title,
         url: window.location.href
       });
     } else {
       await navigator.clipboard.writeText(window.location.href);
-      alert('Enlace copiado al portapapeles');
+      alert('Enlace copiado al portapapeles. ¡Compártelo con tus amigos!');
     }
+  };
+  
+  // Initialize likes count from post data
+  useEffect(() => {
+    setLikesCount(post.likes);
+    
+    // Initialize comments with dummy data
+    setComments([
+      { id: 1, author: 'María García', content: 'Excelente reflexión, justo lo que necesitaba leer hoy.', date: '2023-05-15T14:30:00' },
+      { id: 2, author: 'Juan Pérez', content: 'Me encantó la parte sobre la esperanza activa. Muy inspirador.', date: '2023-05-15T16:45:00' },
+      { id: 3, author: 'Ana Rodríguez', content: 'Gracias por compartir estas palabras de aliento.', date: '2023-05-16T09:20:00' },
+    ]);
+  }, []);
+  
+  // Function to add a new comment
+  const addComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newComment.trim() === '') return;
+    
+    const newCommentObj = {
+      id: comments.length + 1,
+      author: 'Usuario',
+      content: newComment,
+      date: new Date().toISOString()
+    };
+    
+    setComments([...comments, newCommentObj]);
+     setNewComment('');
   };
 
   if (!post) {
@@ -245,14 +286,23 @@ export function BlogPostPage() {
                 </div>
                 
                 <div className="flex items-center space-x-4">
-                  <div className="flex items-center text-gray-600">
-                    <Heart className="w-5 h-5 mr-1" />
-                    <span>{post.likes}</span>
-                  </div>
-                  <div className="flex items-center text-gray-600">
+                  <button 
+                    onClick={() => {
+                      setLiked(!liked);
+                      setLikesCount(liked ? likesCount - 1 : likesCount + 1);
+                    }}
+                    className={`flex items-center ${liked ? 'text-red-500' : 'text-gray-600'} hover:text-red-500 transition-colors focus-ring`}
+                  >
+                    <Heart className="w-5 h-5 mr-1" fill={liked ? 'currentColor' : 'none'} />
+                    <span>{likesCount}</span>
+                  </button>
+                  <button 
+                    onClick={() => setShowComments(!showComments)}
+                    className="flex items-center text-gray-600 hover:text-blue-500 transition-colors focus-ring"
+                  >
                     <MessageCircle className="w-5 h-5 mr-1" />
-                    <span>{post.comments}</span>
-                  </div>
+                    <span>{comments.length}</span>
+                  </button>
                   <button
                     onClick={sharePost}
                     className="flex items-center text-gray-600 hover:text-black transition-colors focus-ring"
@@ -348,19 +398,54 @@ export function BlogPostPage() {
             </div>
           </section>
 
-          {/* Comments Section Placeholder */}
+          {/* Comments Section */}
           <section className="mt-12 pt-8 border-t">
-            <h3 className="text-xl font-semibold mb-6">Comentarios ({post.comments})</h3>
-            <div className="bg-gray-50 rounded-lg p-8 text-center">
-              <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-4">
-                Los comentarios están temporalmente deshabilitados. 
-              </p>
-              <p className="text-sm text-gray-500">
-                Si tienes preguntas o comentarios sobre este artículo, no dudes en 
-                <Link to="/contacto" className="text-black hover:underline ml-1">contactarnos directamente</Link>.
-              </p>
-            </div>
+            <h3 className="text-xl font-semibold mb-6">Comentarios ({comments.length})</h3>
+            
+            {showComments ? (
+              <div className="space-y-6">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="font-medium">{comment.author}</div>
+                      <div className="text-sm text-gray-500">{new Date(comment.date).toLocaleDateString()}</div>
+                    </div>
+                    <p className="text-gray-700">{comment.content}</p>
+                  </div>
+                ))}
+                
+                <form onSubmit={addComment} className="mt-8">
+                  <div className="mb-4">
+                    <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">Añadir comentario</label>
+                    <textarea
+                      id="comment"
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Escribe tu comentario aquí..."
+                      required
+                    ></textarea>
+                  </div>
+                  <button 
+                    type="submit" 
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  >
+                    Publicar comentario
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div 
+                className="bg-gray-50 rounded-lg p-8 text-center cursor-pointer hover:bg-gray-100 transition-colors" 
+                onClick={() => setShowComments(true)}
+              >
+                <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">
+                  Haz clic para ver y añadir comentarios
+                </p>
+              </div>
+            )}
           </section>
         </div>
       </div>
