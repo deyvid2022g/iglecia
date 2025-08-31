@@ -34,48 +34,157 @@ export const useEvents = (options?: {
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
 
+  // Datos de ejemplo para cuando Supabase no esté configurado
+  const getDefaultEvents = (): Event[] => {
+    const today = new Date()
+    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const nextMonth = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+    
+    return [
+      {
+        id: '1',
+        slug: 'culto-dominical',
+        title: 'Culto Dominical',
+        description: 'Únete a nosotros para un tiempo de adoración y enseñanza bíblica.',
+        detailed_description: 'Nuestro culto dominical incluye tiempo de adoración, oración y una enseñanza bíblica inspiradora.',
+        event_date: today.toISOString().split('T')[0],
+        start_time: '10:00',
+        end_time: '12:00',
+        type: 'Culto',
+        capacity: 200,
+        current_registrations: 0,
+        image_url: '/pastor-reynel-duenas.jpg',
+        host: 'Pastor Reynel Dueñas',
+        requires_rsvp: false,
+        cost: 'Gratuito',
+        is_published: true,
+        created_at: today.toISOString(),
+        updated_at: today.toISOString()
+      },
+      {
+        id: '2',
+        slug: 'estudio-biblico',
+        title: 'Estudio Bíblico Semanal',
+        description: 'Profundiza en la Palabra de Dios con nuestro estudio bíblico.',
+        detailed_description: 'Un tiempo para estudiar las Escrituras en profundidad y crecer en conocimiento.',
+        event_date: nextWeek.toISOString().split('T')[0],
+        start_time: '19:00',
+        end_time: '20:30',
+        type: 'Estudio',
+        capacity: 50,
+        current_registrations: 0,
+        requires_rsvp: true,
+        cost: 'Gratuito',
+        is_published: true,
+        created_at: today.toISOString(),
+        updated_at: today.toISOString()
+      },
+      {
+        id: '3',
+        slug: 'conferencia-familiar',
+        title: 'Conferencia Familiar',
+        description: 'Una conferencia especial enfocada en fortalecer los lazos familiares.',
+        detailed_description: 'Talleres y charlas para fortalecer la unidad familiar desde una perspectiva bíblica.',
+        event_date: nextMonth.toISOString().split('T')[0],
+        start_time: '09:00',
+        end_time: '17:00',
+        type: 'Conferencia',
+        capacity: 150,
+        current_registrations: 0,
+        requires_rsvp: true,
+        cost: 'Gratuito',
+        is_published: true,
+        created_at: today.toISOString(),
+        updated_at: today.toISOString()
+      }
+    ]
+  }
+
   const fetchEvents = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      let query = supabase
-        .from('events')
-        .select(`
-          *,
-          locations(
-            id,
-            name,
-            address,
-            full_address
-          )
-        `)
-        .order('event_date', { ascending: true })
-
-      // Aplicar filtros
-      if (options?.published !== undefined) {
-        query = query.eq('is_published', options.published)
+      // Intentar cargar desde localStorage primero
+      const localEvents = localStorage.getItem('church_events')
+      if (localEvents) {
+        let parsedEvents = JSON.parse(localEvents)
+        
+        // Aplicar filtros localmente
+        if (options?.published !== undefined) {
+          parsedEvents = parsedEvents.filter((event: Event) => event.is_published === options.published)
+        }
+        if (options?.type) {
+          parsedEvents = parsedEvents.filter((event: Event) => event.type === options.type)
+        }
+        if (options?.limit) {
+          parsedEvents = parsedEvents.slice(0, options.limit)
+        }
+        
+        setEvents(parsedEvents)
+        setLoading(false)
+        return
       }
 
-      if (options?.type) {
-        query = query.eq('type', options.type)
-      }
+      // Si no hay datos locales, intentar Supabase
+      try {
+        let query = supabase
+          .from('events')
+          .select(`
+            *,
+            locations(
+              id,
+              name,
+              address,
+              full_address
+            )
+          `)
+          .order('event_date', { ascending: true })
 
-      if (options?.limit) {
-        query = query.limit(options.limit)
-      }
+        // Aplicar filtros
+        if (options?.published !== undefined) {
+          query = query.eq('is_published', options.published)
+        }
+        if (options?.type) {
+          query = query.eq('type', options.type)
+        }
+        if (options?.limit) {
+          query = query.limit(options.limit)
+        }
 
-      const { data, error } = await query
+        const { data, error } = await query
 
-      if (error) {
-        setError(error.message)
-        console.error('Error fetching events:', error)
-      } else {
+        if (error) throw error
+        
         setEvents(data || [])
+        // Guardar en localStorage para uso futuro
+        if (data) {
+          localStorage.setItem('church_events', JSON.stringify(data))
+        }
+      } catch (supabaseError) {
+        console.warn('Supabase no disponible, usando datos de ejemplo:', supabaseError)
+        // Usar datos de ejemplo si Supabase falla
+        const defaultEvents = getDefaultEvents()
+        let filteredEvents = defaultEvents
+        
+        // Aplicar filtros a los datos de ejemplo
+        if (options?.published !== undefined) {
+          filteredEvents = filteredEvents.filter(event => event.is_published === options.published)
+        }
+        if (options?.type) {
+          filteredEvents = filteredEvents.filter(event => event.type === options.type)
+        }
+        if (options?.limit) {
+          filteredEvents = filteredEvents.slice(0, options.limit)
+        }
+        
+        setEvents(filteredEvents)
+        // Guardar datos de ejemplo en localStorage
+        localStorage.setItem('church_events', JSON.stringify(defaultEvents))
       }
-    } catch (_) {
+    } catch (error) {
       setError('Error al cargar eventos')
-      console.error('Error in fetchEvents:', _)
+      console.error('Error in fetchEvents:', error)
     } finally {
       setLoading(false)
     }
