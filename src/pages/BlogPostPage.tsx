@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   Calendar, 
-  User, 
   Clock, 
   Tag, 
   Share2, 
@@ -13,7 +12,7 @@ import {
 } from 'lucide-react';
 
 export function BlogPostPage() {
-  const { slug } = useParams();
+  const { slug: _ } = useParams();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
@@ -86,9 +85,9 @@ export function BlogPostPage() {
     `,
     excerpt: 'En tiempos de incertidumbre, la esperanza cristiana se convierte en nuestro ancla. Descubre cómo cultivar una esperanza que trasciende las circunstancias.',
     author: {
-      name: 'Pastor Juan Pérez',
-      avatar: 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      bio: 'Pastor principal de Iglesia Vida Nueva con más de 15 años de ministerio. Especializado en enseñanza bíblica y cuidado pastoral.'
+      name: 'Pastor Reynel Dueñas',
+      avatar: '/Pastor Reynel Dueñas P n g.png',
+      bio: 'Pastor principal de Iglesia Vida Nueva con una pasión profunda por la Palabra de Dios y el cuidado pastoral de la congregación.'
     },
     category: 'Fe',
     tags: ['esperanza', 'vida cristiana', 'reflexión', 'promesas de Dios'],
@@ -158,7 +157,7 @@ export function BlogPostPage() {
       { id: 2, author: 'Juan Pérez', content: 'Me encantó la parte sobre la esperanza activa. Muy inspirador.', date: '2023-05-15T16:45:00' },
       { id: 3, author: 'Ana Rodríguez', content: 'Gracias por compartir estas palabras de aliento.', date: '2023-05-16T09:20:00' },
     ]);
-  }, []);
+  }, [post.likes]);
   
   // Function to add a new comment
   const addComment = (e: React.FormEvent) => {

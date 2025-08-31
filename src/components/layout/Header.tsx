@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, User, LogOut, Settings } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useSupabaseAuth } from '../../contexts/SupabaseAuthContext';
 import { AnimatedLogo } from '../AnimatedLogo';
 
 export function Header() {
@@ -9,7 +9,12 @@ export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { user, profile, signOut } = useSupabaseAuth();
+  
+  const handleLogout = async () => {
+    await signOut();
+    setShowUserMenu(false);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -36,11 +41,6 @@ export function Header() {
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
     document.body.style.overflow = !isMenuOpen ? 'hidden' : '';
-  };
-
-  const handleLogout = () => {
-    logout();
-    setShowUserMenu(false);
   };
 
   return (
@@ -86,30 +86,30 @@ export function Header() {
               </Link>
             ))}
             
-            {isAuthenticated ? (
+            {user && profile ? (
               <div className="relative ml-4">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 transition-colors focus-ring"
                 >
                   <img
-                    src={user?.avatar || '/trabajo.png'}
-                    alt={user?.name || 'Usuario'}
-                    className="w-8 h-8 rounded-full"
+                    src={profile.avatar_url || user.user_metadata?.avatar_url || '/default-avatar.png'}
+                alt={user?.name || 'Usuario'}
+                    className="w-8 h-8 rounded-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.onerror = null;
-                      target.src = '/trabajo.png';
+                      target.src = '/default-avatar.png';
                     }}
                   />
-                  <span className="hidden lg:block text-sm font-medium">{user?.name}</span>
+                  <span className="hidden lg:block text-sm font-medium">{profile.full_name || user.user_metadata?.name || user.email}</span>
                 </button>
                 
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-2 z-50">
                     <div className="px-4 py-2 border-b">
-                      <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                      <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                      <p className="text-sm font-medium text-gray-900">{profile.full_name || user.user_metadata?.name || user.email}</p>
+              <p className="text-xs text-gray-500 capitalize">{profile.role}</p>
                     </div>
                     <Link
                       to="/dashboard"
@@ -199,17 +199,17 @@ export function Header() {
           ))}
           
           <div className="pt-4 space-y-2">
-            {isAuthenticated ? (
+            {user && profile ? (
               <>
                 <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 rounded-lg">
                   <img
-                    src={user?.avatar || 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'}
-                    alt={user?.name}
-                    className="w-10 h-10 rounded-full"
+                    src={profile.avatar_url || user.user_metadata?.avatar_url || '/default-avatar.png'}
+                    alt={profile.full_name || user.user_metadata?.name || 'Usuario'}
+                    className="w-10 h-10 rounded-full object-cover"
                   />
                   <div>
-                    <p className="font-medium">{user?.name}</p>
-                    <p className="text-sm text-gray-600 capitalize">{user?.role}</p>
+                    <p className="font-medium">{profile.full_name || user.user_metadata?.name || user.email}</p>
+                    <p className="text-sm text-gray-600 capitalize">{profile.role}</p>
                   </div>
                 </div>
                 <Link

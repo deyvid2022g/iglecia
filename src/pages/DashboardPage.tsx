@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { Calendar, Video, BookOpen, PlusCircle, Edit, Trash2, Youtube, Save, X } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { Calendar, Video, BookOpen, PlusCircle, Edit, Trash2, Save, X } from 'lucide-react';
+import { useSermons, type Sermon } from '../hooks/useSermons';
 
 // Interfaces para los datos
 interface Event {
@@ -22,20 +23,7 @@ interface Event {
   requiresRSVP: boolean;
 }
 
-interface Sermon {
-  id: number;
-  title: string;
-  speaker: string;
-  date: string;
-  duration: string;
-  thumbnail: string;
-  description: string;
-  tags: string[];
-  videoUrl: string;
-  audioUrl: string;
-  hasTranscript: boolean;
-  viewCount: number;
-}
+// Interfaz Sermon removida - ahora se importa desde useSermons hook
 
 interface BlogPost {
   id: number;
@@ -55,10 +43,11 @@ interface BlogPost {
 }
 
 export function DashboardPage() {
-  const { user, hasRole } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [events, setEvents] = useState<Event[]>([]);
   const [sermons, setSermons] = useState<Sermon[]>([]);
+  const { createSermon, updateSermon, deleteSermon } = useSermons();
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -96,7 +85,7 @@ export function DashboardPage() {
           capacity: 300,
           registrations: 85,
           image: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop',
-          host: 'Pastor Juan Pérez',
+          host: 'Pastor Reynel Dueñas',
           requiresRSVP: false
         },
         {
@@ -114,7 +103,7 @@ export function DashboardPage() {
           capacity: 50,
           registrations: 32,
           image: 'https://images.pexels.com/photos/1024993/pexels-photo-1024993.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop',
-          host: 'Pastores Juan y María',
+          host: 'Pastor Reynel Dueñas',
           requiresRSVP: true
         }
       ]);
@@ -130,7 +119,7 @@ export function DashboardPage() {
         {
           id: 1,
           title: 'Diseñados para la Gloria de Dios',
-          speaker: 'Pastor Juan Pérez',
+          speaker: 'Pastor Reynel Dueñas',
           date: '2025-01-06',
           duration: '38:20',
           thumbnail: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
@@ -138,13 +127,13 @@ export function DashboardPage() {
           tags: ['identidad', 'propósito', 'gloria'],
           videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
           audioUrl: '/audio/sermon-001.mp3',
-          hasTranscript: true,
+          has_transcript: true,
           viewCount: 1204
         },
         {
           id: 2,
           title: 'El Corazón del Padre Revelado',
-          speaker: 'Pastora María Gómez',
+          speaker: 'Pastor Reynel Dueñas',
           date: '2025-01-13',
           duration: '35:15',
           thumbnail: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
@@ -152,7 +141,7 @@ export function DashboardPage() {
           tags: ['amor paternal', 'servicio', 'revelación'],
           videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
           audioUrl: '/audio/sermon-002.mp3',
-          hasTranscript: true,
+          has_transcript: true,
           viewCount: 892
         }
       ]);
@@ -160,6 +149,7 @@ export function DashboardPage() {
       
       // Cargar blogs desde localStorage o usar ejemplos
       const savedBlogPosts = localStorage.getItem('churchBlogPosts');
+
       if (savedBlogPosts) {
         setBlogPosts(JSON.parse(savedBlogPosts));
       } else {
@@ -171,8 +161,8 @@ export function DashboardPage() {
           excerpt: 'En tiempos de incertidumbre, la esperanza cristiana se convierte en nuestro ancla.',
           content: 'Contenido completo del post...',
           author: {
-            name: 'Pastor Juan Pérez',
-            avatar: 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+            name: 'Pastor Reynel Dueñas',
+            avatar: '/pastor-reynel-duenas.jpg'
           },
           category: 'Fe',
           tags: ['esperanza', 'vida cristiana', 'reflexión'],
@@ -187,8 +177,8 @@ export function DashboardPage() {
           excerpt: 'Servir es una de las formas más hermosas de expresar nuestro amor por Dios y por otros.',
           content: 'Contenido completo del post...',
           author: {
-            name: 'Pastora María Gómez',
-            avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+            name: 'Pastor Reynel Dueñas',
+            avatar: '/pastor-reynel-duenas.jpg'
           },
           category: 'Comunidad',
           tags: ['voluntariado', 'servicio', 'comunidad'],
@@ -202,7 +192,8 @@ export function DashboardPage() {
       
       setIsLoading(false);
     }, 1000);
-  }, []);
+
+  }, []); // Empty dependency array since we only want to run this effect once on mount
   
   // Función para agregar un nuevo evento
   const handleAddEvent = (event: Event) => {
@@ -227,25 +218,65 @@ export function DashboardPage() {
   };
   
   // Función para agregar una nueva predica
-  const handleAddSermon = (sermon: Sermon) => {
-    let updatedSermons;
-    if (currentSermon) {
-      // Actualizar predica existente
-      updatedSermons = sermons.map(s => s.id === currentSermon.id ? sermon : s);
-      setSermons(updatedSermons);
-    } else {
-      // Agregar nueva predica
-      const newSermon = {
-        ...sermon,
-        id: sermons.length > 0 ? Math.max(...sermons.map(s => s.id)) + 1 : 1
-      };
-      updatedSermons = [...sermons, newSermon];
-      setSermons(updatedSermons);
+  const handleAddSermon = async (sermonData: {
+    title: string;
+    description: string;
+    speaker: string;
+    date: string;
+    duration?: string;
+    videoUrl?: string;
+    audioUrl?: string;
+    tags?: string;
+    thumbnail?: string;
+    hasTranscript?: boolean;
+  }) => {
+    try {
+      if (currentSermon) {
+        // Actualizar prédica existente
+        const result = await updateSermon(currentSermon.id.toString(), {
+          title: sermonData.title,
+          description: sermonData.description,
+          speaker: sermonData.speaker,
+          sermon_date: sermonData.date,
+          duration: sermonData.duration || null,
+          video_url: sermonData.videoUrl,
+          thumbnail_url: sermonData.thumbnail,
+          tags: sermonData.tags ? sermonData.tags.split(',').map((tag: string) => tag.trim()) : [],
+          has_transcript: sermonData.has_transcript || false
+        });
+        
+        if (result.error) {
+          throw new Error(result.error.message || 'Error al actualizar la prédica');
+        }
+      } else {
+        // Crear nueva prédica
+        const result = await createSermon({
+          slug: sermonData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+          title: sermonData.title,
+          description: sermonData.description,
+          speaker: sermonData.speaker,
+          sermon_date: sermonData.date,
+          duration: sermonData.duration || null,
+          video_url: sermonData.videoUrl,
+          thumbnail_url: sermonData.thumbnail,
+          tags: sermonData.tags ? sermonData.tags.split(',').map((tag: string) => tag.trim()) : [],
+          has_transcript: sermonData.has_transcript || false,
+          is_published: true,
+          featured: false
+        });
+        
+        if (result.error) {
+          throw new Error(result.error.message || 'Error al crear la prédica');
+        }
+      }
+      // Refrescar la lista de prédicas para mostrar los cambios
+      await refreshSermons();
+      setShowSermonForm(false);
+      setCurrentSermon(null);
+    } catch (err) {
+      console.error('Error al guardar prédica:', err);
+      alert('Error al guardar la prédica. Por favor, intenta de nuevo.');
     }
-    // Guardar en localStorage
-    localStorage.setItem('churchSermons', JSON.stringify(updatedSermons));
-    setShowSermonForm(false);
-    setCurrentSermon(null);
   };
   
   // Función para agregar un nuevo blog
@@ -281,12 +312,14 @@ export function DashboardPage() {
   };
   
   // Función para eliminar una predica
-  const handleDeleteSermon = (id: number) => {
-    if (confirm('¿Estás seguro de que deseas eliminar esta predica?')) {
-      const updatedSermons = sermons.filter(sermon => sermon.id !== id);
-      setSermons(updatedSermons);
-      // Guardar en localStorage
-      localStorage.setItem('churchSermons', JSON.stringify(updatedSermons));
+  const handleDeleteSermon = async (id: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar esta prédica?')) {
+      try {
+        await deleteSermon(id);
+      } catch (err) {
+        console.error('Error al eliminar prédica:', err);
+        alert('Error al eliminar la prédica. Por favor, intenta de nuevo.');
+      }
     }
   };
   
@@ -318,15 +351,37 @@ export function DashboardPage() {
     setShowBlogForm(true);
   };
 
-  // Verificar si el usuario es administrador
-  const isAdmin = hasRole('admin') || hasRole('pastor');
+  // Verificar si el usuario está autenticado y tiene permisos
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'pastor' || profile?.role === 'leader';
 
-  // Si el usuario no es administrador, mostrar mensaje de acceso denegado
+  // Mostrar loading mientras se verifica la autenticación
+  if (authLoading) {
+    return (
+      <div className="container mx-auto px-4 py-12 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+        <p className="mt-4">Verificando autenticación...</p>
+      </div>
+    );
+  }
+
+  // Si no hay usuario autenticado, mostrar mensaje
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-12 text-center">
+        <h1 className="text-3xl font-bold mb-6 text-red-600">Acceso Denegado</h1>
+        <p className="text-lg mb-4">Debes iniciar sesión para acceder al panel de administración.</p>
+        <p>Por favor, inicia sesión con una cuenta autorizada.</p>
+      </div>
+    );
+  }
+
+  // Si el usuario no tiene permisos, mostrar mensaje de acceso denegado
   if (!isAdmin) {
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <h1 className="text-3xl font-bold mb-6 text-red-600">Acceso Denegado</h1>
         <p className="text-lg mb-4">No tienes permisos para acceder al panel de administración.</p>
+        <p>Tu rol actual: {profile?.role || 'Sin rol asignado'}</p>
         <p>Por favor, contacta al administrador si crees que deberías tener acceso.</p>
       </div>
     );
@@ -386,8 +441,8 @@ export function DashboardPage() {
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
               <div className="flex items-center space-x-4 mb-4">
                 <img 
-                  src={user?.avatar || '/trabajo.png'} 
-                  alt={user?.name || 'Usuario'}
+                  src={profile?.avatar_url || '/trabajo.png'} 
+                  alt={profile?.full_name || 'Usuario'}
                   className="w-16 h-16 rounded-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -396,27 +451,27 @@ export function DashboardPage() {
                   }}
                 />
                 <div>
-                  <h2 className="text-xl font-semibold">{user?.name}</h2>
-                  <p className="text-gray-600 capitalize">{user?.role}</p>
+                  <h2 className="text-xl font-semibold">{profile?.full_name}</h2>
+                <p className="text-gray-600 capitalize">{profile?.role}</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium text-gray-500">Email</p>
-                  <p>{user?.email}</p>
+                  <p>{profile?.email || user?.email}</p>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium text-gray-500">Teléfono</p>
-                  <p>{user?.phone || 'No especificado'}</p>
+                  <p>{profile?.phone || 'No especificado'}</p>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium text-gray-500">Fecha de registro</p>
-                  <p>{new Date(user?.joinDate || '').toLocaleDateString()}</p>
+                  <p>{profile?.join_date ? new Date(profile.join_date).toLocaleDateString() : 'No disponible'}</p>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium text-gray-500">Último acceso</p>
-                  <p>{user?.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'No disponible'}</p>
+                  <p>{profile?.last_login ? new Date(profile.last_login).toLocaleString() : 'No disponible'}</p>
                 </div>
               </div>
             </div>
@@ -669,7 +724,7 @@ export function DashboardPage() {
                               capacity: 100,
                               registrations: 0,
                               image: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop',
-                              host: 'Pastor Principal',
+                              host: 'Pastor Reynel Dueñas',
                               requiresRSVP: false
                             };
                             handleAddEvent(eventData);
@@ -721,13 +776,12 @@ export function DashboardPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10">
-                              <img className="h-10 w-10 rounded object-cover" src={sermon.thumbnail} alt={sermon.title} />
+                              <img className="h-10 w-10 rounded object-cover" src={sermon.thumbnail_url || '/default-sermon.jpg'} alt={sermon.title} />
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">{sermon.title}</div>
                               <div className="text-sm text-gray-500 flex items-center">
-                                <Youtube className="w-4 h-4 mr-1 text-red-600" />
-                                {sermon.viewCount} visualizaciones
+                                {sermon.view_count} visualizaciones
                               </div>
                             </div>
                           </div>
@@ -736,7 +790,7 @@ export function DashboardPage() {
                           {sermon.speaker}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(sermon.date).toLocaleDateString()}
+                          {new Date(sermon.sermon_date).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {sermon.duration}
@@ -750,7 +804,7 @@ export function DashboardPage() {
                           </button>
                           <button 
                             className="text-red-600 hover:text-red-900"
-                            onClick={() => handleDeleteSermon(sermon.id)}
+                            onClick={() => handleDeleteSermon(sermon.id.toString())}
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
@@ -778,14 +832,31 @@ export function DashboardPage() {
                       </button>
                     </div>
                     
-                    <form className="space-y-4">
+                    <form className="space-y-4" onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.target as HTMLFormElement);
+                      const sermonData = {
+                        title: formData.get('title') as string,
+                        speaker: formData.get('speaker') as string,
+                        date: formData.get('date') as string,
+                        duration: formData.get('duration') as string,
+                        videoUrl: formData.get('videoUrl') as string,
+                        description: formData.get('description') as string,
+                        tags: formData.get('tags') as string,
+                        thumbnail: formData.get('thumbnail') as string,
+                        has_transcript: formData.get('hasTranscript') === 'on'
+                      };
+                      handleAddSermon(sermonData);
+                    }}>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
                         <input 
                           type="text" 
+                          name="title"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="Título de la predica"
                           defaultValue={currentSermon?.title}
+                          required
                         />
                       </div>
                       
@@ -794,17 +865,21 @@ export function DashboardPage() {
                           <label className="block text-sm font-medium text-gray-700 mb-1">Predicador</label>
                           <input 
                             type="text" 
+                            name="speaker"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Nombre del predicador"
                             defaultValue={currentSermon?.speaker}
+                            required
                           />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
                           <input 
                             type="date" 
+                            name="date"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            defaultValue={currentSermon?.date}
+                            defaultValue={currentSermon?.sermon_date}
+                            required
                           />
                         </div>
                       </div>
@@ -814,6 +889,7 @@ export function DashboardPage() {
                           <label className="block text-sm font-medium text-gray-700 mb-1">Duración</label>
                           <input 
                             type="text" 
+                            name="duration"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="HH:MM:SS"
                             defaultValue={currentSermon?.duration}
@@ -822,10 +898,11 @@ export function DashboardPage() {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">URL de YouTube</label>
                           <input 
-                            type="text" 
+                            type="url" 
+                            name="videoUrl"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="https://www.youtube.com/embed/..."
-                            defaultValue={currentSermon?.videoUrl}
+                            defaultValue={currentSermon?.video_url}
                           />
                         </div>
                       </div>
@@ -833,10 +910,12 @@ export function DashboardPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                         <textarea 
+                          name="description"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           rows={4}
                           placeholder="Descripción de la predica"
                           defaultValue={currentSermon?.description}
+                          required
                         ></textarea>
                       </div>
                       
@@ -844,19 +923,21 @@ export function DashboardPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Etiquetas (separadas por coma)</label>
                         <input 
                           type="text" 
+                          name="tags"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="fe, esperanza, amor"
-                          defaultValue={currentSermon?.tags.join(', ')}
+                          defaultValue={currentSermon?.tags?.join(', ')}
                         />
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">URL de la miniatura</label>
                         <input 
-                          type="text" 
+                          type="url" 
+                          name="thumbnail"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="https://ejemplo.com/imagen.jpg"
-                          defaultValue={currentSermon?.thumbnail}
+                          defaultValue={currentSermon?.thumbnail_url}
                         />
                       </div>
                       
@@ -864,8 +945,9 @@ export function DashboardPage() {
                         <input 
                           type="checkbox" 
                           id="hasTranscript" 
+                          name="hasTranscript"
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          defaultChecked={currentSermon?.hasTranscript}
+                          defaultChecked={currentSermon?.has_transcript}
                         />
                         <label htmlFor="hasTranscript" className="ml-2 block text-sm text-gray-900">
                           Incluye transcripción
@@ -884,27 +966,8 @@ export function DashboardPage() {
                           Cancelar
                         </button>
                         <button 
-                          type="button"
+                          type="submit"
                           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          onClick={() => {
-                            // Aquí se procesaría el formulario y se llamaría a handleAddSermon
-                            // Por simplicidad, usamos la predica actual o una nueva
-                            const sermonData = currentSermon || {
-                              id: 0,
-                              title: 'Nueva Predica',
-                              speaker: 'Pastor Principal',
-                              date: '2025-03-01',
-                              duration: '30:00',
-                              thumbnail: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
-                              description: 'Descripción de la nueva predica',
-                              tags: ['fe', 'esperanza'],
-                              videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-                              audioUrl: '/audio/sermon-new.mp3',
-                              hasTranscript: false,
-                              viewCount: 0
-                            };
-                            handleAddSermon(sermonData);
-                          }}
                         >
                           <Save className="w-5 h-5 mr-1 inline" />
                           {currentSermon ? 'Actualizar' : 'Guardar'}
@@ -1102,8 +1165,7 @@ export function DashboardPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             defaultValue={currentBlogPost?.author.name}
                           >
-                            <option value="Pastor Juan Pérez">Pastor Juan Pérez</option>
-                            <option value="Pastora María Gómez">Pastora María Gómez</option>
+                            <option value="Pastor Reynel Dueñas">Pastor Reynel Dueñas</option>
                           </select>
                         </div>
                       </div>
@@ -1131,8 +1193,8 @@ export function DashboardPage() {
                               excerpt: 'Extracto de la nueva entrada de blog',
                               content: 'Contenido completo de la nueva entrada de blog...',
                               author: {
-                                name: 'Pastor Juan Pérez',
-                                avatar: 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+                                name: 'Pastor Reynel Dueñas',
+                                avatar: '/pastor-reynel-duenas.jpg'
                               },
                               category: 'Fe',
                               tags: ['fe', 'esperanza'],

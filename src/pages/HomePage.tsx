@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Calendar, Heart, ArrowRight, Users, Baby, MapPin, Mail, Phone, Building } from 'lucide-react';
+import { Calendar, Heart, ArrowRight, Users, Baby, MapPin, Phone, X } from 'lucide-react';
 import { HeroLogo } from '../components/HeroLogo';
 
 export function HomePage() {
   const [isVisible, setIsVisible] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 100);
@@ -107,7 +108,7 @@ export function HomePage() {
     }
   ];
 
-  const [currentTestimonial, setCurrentTestimonial] = useState(0);
+  const [_currentTestimonial, setCurrentTestimonial] = useState(0);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   useEffect(() => {
@@ -148,12 +149,12 @@ export function HomePage() {
                 isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
               }`}
             >
-              <a 
-                href="#horarios"
+              <button 
+                onClick={() => setShowScheduleModal(true)}
                 className="btn-primary text-center"
               >
-                Experimenta Su presencia
-              </a>
+                Horarios de atención
+              </button>
               <Link 
                 to="/predicas"
                 className="btn-secondary text-center"
@@ -199,7 +200,7 @@ export function HomePage() {
               </div>
               <p className="text-gray-600 mb-4">
                 <strong>+57 (311) 533 1485</strong><br />
-                info@lugarderefugio.com
+                iglecristianalugarderefugio@gmail.com
               </p>
               <Link 
                 to="/contacto"
@@ -291,7 +292,17 @@ export function HomePage() {
                   
                   <div className="mt-4">
                     <Link 
-                      to={`/grupos/${group.id}`}
+                      to={
+                        group.id === 'zonakids' ? '/zona-kids' :
+                        group.id === 'familias' ? '/familias' :
+                        group.id === 'parejas' ? '/parejas' :
+                        group.id === 'alabanza' ? '/alabanza' :
+                        group.id === 'danza' ? '/danza' :
+                        group.id === 'produccion' ? '/produccion' :
+                        group.id === 'caballeros' ? '/caballeros' :
+                        group.id === 'mujeres' ? '/mujeres' :
+                        `/grupos/${group.id}`
+                      }
                       className="inline-flex items-center text-black font-medium hover:underline focus-ring"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -411,7 +422,7 @@ export function HomePage() {
       </section>
 
       {/* CTA Final */}
-      <section className="py-16 bg-black text-white">
+      <section id="soy-nuevo" className="py-16 bg-black text-white">
         <div className="container mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Soy Nuevo
@@ -420,13 +431,83 @@ export function HomePage() {
             ¿Primera vez en Lugar de Refugio? Nos encantaría conocerte y ayudarte a conectar con nuestra comunidad.
           </p>
           <Link 
-            to="/soy-nuevo"
+            to="/nosotros#soy-nuevo"
             className="btn-primary bg-white text-black hover:bg-gray-100"
           >
             Quiero conectarme
           </Link>
         </div>
       </section>
+
+      {/* Modal de Horarios de Atención */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Horarios de Atención</h2>
+                <button
+                  onClick={() => setShowScheduleModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <form className="space-y-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Lunes a Viernes
+                    </label>
+                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900">
+                      8:00 AM – 6:00 PM
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sábado
+                    </label>
+                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900">
+                      9:00 AM – 1:00 PM
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Domingo
+                    </label>
+                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900">
+                      Cerrado
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="pt-4 border-t border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    Sede Principal
+                  </label>
+                  <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900">
+                    Cra. 33 #26-21, Villavicencio, Meta
+                  </div>
+                </div>
+                
+                <div className="flex justify-end pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(false)}
+                    className="btn-secondary"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, User, Tag, Search, Filter, Clock } from 'lucide-react';
+import { Tag, Search, Filter, Clock } from 'lucide-react';
 
 export function BlogPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,8 +17,8 @@ export function BlogPage() {
       excerpt: 'En tiempos de incertidumbre, la esperanza cristiana se convierte en nuestro ancla. Descubre cómo cultivar una esperanza que trasciende las circunstancias.',
       content: 'Contenido completo del post...',
       author: {
-        name: 'Pastor Juan Pérez',
-        avatar: 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+        name: 'Pastor Reynel Dueñas',
+        avatar: '/Pastor Reynel Dueñas P n g.png'
       },
       category: 'Fe',
       tags: ['esperanza', 'vida cristiana', 'reflexión'],
@@ -34,8 +34,8 @@ export function BlogPage() {
       excerpt: 'Servir es una de las formas más hermosas de expresar nuestro amor por Dios y por otros. Te mostramos las diferentes oportunidades de voluntariado disponibles.',
       content: 'Contenido completo del post...',
       author: {
-        name: 'Pastora María Gómez',
-        avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+        name: 'Pastor Reynel Dueñas',
+        avatar: '/Pastor Reynel Dueñas P n g.png'
       },
       category: 'Comunidad',
       tags: ['voluntariado', 'servicio', 'comunidad'],
@@ -51,8 +51,8 @@ export function BlogPage() {
       excerpt: 'El matrimonio es un regalo de Dios que requiere cuidado constante. Exploramos cinco principios fundamentales para un matrimonio sólido.',
       content: 'Contenido completo del post...',
       author: {
-        name: 'Pastor Carlos Ruiz',
-        avatar: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+        name: 'Pastor Reynel Dueñas',
+        avatar: '/Pastor Reynel Dueñas P n g.png'
       },
       category: 'Familia',
       tags: ['matrimonio', 'familia', 'relaciones'],

@@ -23,6 +23,31 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // Variables y imports no utilizados
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          'argsIgnorePattern': '^_',
+          'varsIgnorePattern': '^_',
+          'caughtErrorsIgnorePattern': '^_'
+        }
+      ],
+      'no-unused-vars': 'off', // Desactivar la regla base en favor de la de TypeScript
+      
+      // Mejores prácticas de TypeScript
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-empty-function': 'warn',
+      
+      // Mejores prácticas generales
+      'no-console': 'off', // Permitir console.log durante desarrollo
+      'no-debugger': 'error',
+      'no-duplicate-imports': 'error',
+      'no-unreachable': 'error',
+      'prefer-const': 'error',
+      
+      // React específicas
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/rules-of-hooks': 'error',
     },
   }
 );

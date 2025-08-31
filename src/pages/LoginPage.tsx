@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight } from 'lucide-react';
 
@@ -17,7 +17,8 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { login, register, loading, isAuthenticated } = useAuth();
+  const { signIn, signUp, loading, user } = useSupabaseAuth();
+  const isAuthenticated = !!user;
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -68,29 +69,24 @@ export function LoginPage() {
     setIsSubmitting(true);
     
     try {
-      let success = false;
-      
       if (isLogin) {
-        success = await login(formData.email, formData.password);
-        if (!success) {
+        const { error } = await signIn(formData.email, formData.password);
+        if (error) {
           setErrors({ submit: 'Credenciales incorrectas. Verifica tu email y contraseña.' });
         }
       } else {
-        success = await register({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
+        const { error } = await signUp(formData.email, formData.password, {
+          full_name: formData.name,
           phone: formData.phone
         });
-        if (!success) {
-          setErrors({ submit: 'Este correo electrónico ya está registrado.' });
+        if (error) {
+          setErrors({ submit: error.message || 'Error al registrar usuario.' });
+        } else {
+          setErrors({ submit: '' });
+          alert('Registro exitoso. Revisa tu correo para confirmar tu cuenta.');
         }
       }
-      
-      if (success) {
-        // La navegación se maneja en el useEffect
-      }
-    } catch (error) {
+    } catch (_) {
       setErrors({ submit: 'Ocurrió un error. Inténtalo de nuevo.' });
     } finally {
       setIsSubmitting(false);
@@ -340,7 +336,7 @@ export function LoginPage() {
           {isLogin && (
             <div className="text-center">
               <Link 
-                to="/forgot-password" 
+                to="/contacto" 
                 className="text-sm text-gray-600 hover:text-black transition-colors"
               >
                 ¿Olvidaste tu contraseña?
@@ -353,11 +349,11 @@ export function LoginPage() {
         <div className="text-center text-xs text-gray-500">
           <p>Al {isLogin ? 'iniciar sesión' : 'registrarte'}, aceptas nuestros</p>
           <div className="space-x-4 mt-1">
-            <Link to="/terminos" className="hover:text-black transition-colors">
+            <Link to="/nosotros" className="hover:text-black transition-colors">
               Términos de Servicio
             </Link>
             <span>•</span>
-            <Link to="/privacidad" className="hover:text-black transition-colors">
+            <Link to="/nosotros" className="hover:text-black transition-colors">
               Política de Privacidad
             </Link>
           </div>

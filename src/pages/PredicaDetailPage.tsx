@@ -10,8 +10,6 @@ import {
   Clock,
   Calendar,
   User,
-  ChevronLeft,
-  ChevronRight,
   Maximize,
   Heart,
   MessageCircle
@@ -19,7 +17,7 @@ import {
 
 export function SermonDetailPage() {
   // Renamed from SermonDetailPage but keeping the same function name for compatibility
-  const { slug } = useParams();
+  const { slug: _ } = useParams();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -29,20 +27,20 @@ export function SermonDetailPage() {
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(45); // Initial likes count
   const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<{ id: number; author: string; text: string; date: string }[]>([]);
   const [newComment, setNewComment] = useState('');
 
   // Simulated predica data - in real app this would come from an API
   const sermon = {
-    id: 1,
+    id: '1',
     title: 'Fe que transforma',
-    speaker: 'Pastor Juan Pérez',
-    date: '2025-01-06',
+    speaker: 'Pastor Reynel Dueñas',
+    sermon_date: '2025-01-06',
     duration: '38:20',
     description: 'En este mensaje profundizamos sobre cómo la fe activa puede transformar nuestras vidas, comunidades y el mundo que nos rodea. Exploramos ejemplos bíblicos y aplicaciones prácticas para vivir una fe que produce frutos tangibles.',
     tags: ['fe', 'transformación', 'vida cristiana'],
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    thumbnail: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=1200&h=675&fit=crop',
+    video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    thumbnail_url: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=1200&h=675&fit=crop',
     chapters: [
       { time: 0, title: 'Introducción y bienvenida' },
       { time: 300, title: 'Definiendo la fe transformadora' },
@@ -73,20 +71,20 @@ export function SermonDetailPage() {
   // Simulated related predicas
   const relatedSermons = [
     {
-      id: 2,
+      id: '2',
       slug: 'amor-y-servicio',
       title: 'Amor y servicio',
-      speaker: 'Pastora María Gómez',
-      date: '2025-01-13',
-      thumbnail: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=400&h=225&fit=crop'
+      speaker: 'Pastor Reynel Dueñas',
+      sermon_date: '2025-01-13',
+      thumbnail_url: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=400&h=225&fit=crop'
     },
     {
-      id: 3,
+      id: '3',
       slug: 'esperanza-en-tiempos-dificiles',
       title: 'Esperanza en tiempos difíciles',
-      speaker: 'Pastor Juan Pérez',
-      date: '2025-01-20',
-      thumbnail: 'https://images.pexels.com/photos/289586/pexels-photo-289586.jpeg?auto=compress&cs=tinysrgb&w=400&h=225&fit=crop'
+      speaker: 'Pastor Reynel Dueñas',
+      sermon_date: '2025-01-20',
+      thumbnail_url: 'https://images.pexels.com/photos/289586/pexels-photo-289586.jpeg?auto=compress&cs=tinysrgb&w=400&h=225&fit=crop'
     }
   ];
 
@@ -170,15 +168,15 @@ export function SermonDetailPage() {
         await navigator.clipboard.writeText(window.location.href);
         alert('Enlace copiado al portapapeles');
       }
-    } catch (error) {
-      console.error('Error al compartir:', error);
+    } catch (_) {
+      console.error('Error al compartir:', _);
     }
   };
   
   // Initialize comments with dummy data
   useEffect(() => {
     setComments([
-      { id: 1, author: 'Carlos Mendoza', content: 'Esta prédica cambió mi perspectiva sobre la fe. Gracias pastor.', date: '2023-05-15T14:30:00' },
+      { id: 1, author: 'Carlos Mendoza', content: 'Esta prédica cambió mi perspectiva sobre la fe. Gracias Pastor Reynel.', date: '2023-05-15T14:30:00' },
       { id: 2, author: 'Laura Sánchez', content: 'Justo lo que necesitaba escuchar hoy. Dios habló a mi corazón.', date: '2023-05-16T09:20:00' },
       { id: 3, author: 'Roberto Gómez', content: '¡Excelente mensaje! Lo compartiré con mi grupo familiar.', date: '2023-05-16T16:45:00' },
     ]);
@@ -253,10 +251,10 @@ export function SermonDetailPage() {
                   <video
                     ref={videoRef}
                     className="w-full h-full"
-                    poster={sermon.thumbnail}
+                    poster={sermon.thumbnail_url}
                     preload="metadata"
                   >
-                    <source src={sermon.videoUrl} type="video/mp4" />
+                    <source src={sermon.video_url} type="video/mp4" />
                     <track kind="captions" src="/captions/fe-que-transforma.vtt" srcLang="es" label="Español" />
                     Tu navegador no soporta video HTML5.
                   </video>
@@ -326,7 +324,7 @@ export function SermonDetailPage() {
                   </div>
                   <div className="flex items-center">
                     <Calendar className="w-5 h-5 mr-2" />
-                    <span>{formatDate(sermon.date)}</span>
+                    <span>{formatDate(sermon.sermon_date)}</span>
                   </div>
                   <div className="flex items-center">
                     <Clock className="w-5 h-5 mr-2" />
@@ -449,7 +447,7 @@ export function SermonDetailPage() {
                     >
                       <div className="aspect-video rounded-lg overflow-hidden mb-2">
                         <img
-                          src={relatedSermon.thumbnail}
+                          src={relatedSermon.thumbnail_url}
                           alt={relatedSermon.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -458,7 +456,7 @@ export function SermonDetailPage() {
                         {relatedSermon.title}
                       </h4>
                       <p className="text-xs text-gray-600 mb-1">{relatedSermon.speaker}</p>
-                      <p className="text-xs text-gray-500">{formatDate(relatedSermon.date)}</p>
+                      <p className="text-xs text-gray-500">{formatDate(relatedSermon.sermon_date)}</p>
                     </Link>
                   ))}
                 </div>

@@ -147,10 +147,10 @@ export function AgeGroupPage() {
       color: 'bg-blue-100 text-blue-800 border-blue-200',
       image: 'https://images.pexels.com/photos/1708936/pexels-photo-1708936.jpeg?auto=compress&cs=tinysrgb&w=1200&h=600&fit=crop',
       leader: {
-        name: 'Pastor Carlos Ruiz',
+        name: 'Pastor Reynel Dueñas',
         role: 'Pastor de Jóvenes',
-        bio: 'Líder dinámico con pasión por el ministerio juvenil. Especialista en discipulado y formación de líderes jóvenes.',
-        image: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&fit=crop'
+        bio: 'Pastor principal con una pasión profunda por el ministerio juvenil y la formación de líderes jóvenes.',
+        image: '/Pastor Reynel Dueñas P n g.png'
       },
       activities: [
         {
@@ -208,10 +208,10 @@ export function AgeGroupPage() {
       color: 'bg-gray-100 text-gray-800 border-gray-200',
       image: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=1200&h=600&fit=crop',
       leader: {
-        name: 'Pastor Juan Pérez',
+        name: 'Pastor Reynel Dueñas',
         role: 'Pastor Principal',
-        bio: 'Con más de 15 años de ministerio, se especializa en enseñanza bíblica expositiva y cuidado pastoral.',
-        image: 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&fit=crop'
+        bio: 'Pastor principal con una pasión profunda por la enseñanza bíblica expositiva y el cuidado pastoral de la congregación.',
+        image: '/Pastor Reynel Dueñas P n g.png'
       },
       activities: [
         {

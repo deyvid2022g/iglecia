@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Phone, Mail, Clock, Facebook, Instagram, Youtube } from 'lucide-react';
+import { Phone, Mail, Clock, Facebook, Instagram, Youtube } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -92,8 +92,8 @@ export function Footer() {
                 <Mail className="w-5 h-5 mr-3 flex-shrink-0" />
                 <div>
                   <div className="font-medium text-white">Email</div>
-                  <a href="mailto:info@lugarderefugio.com" className="hover:underline">
-                    info@lugarderefugio.com
+                  <a href="mailto:iglecristianalugarderefugio@gmail.com" className="hover:underline">
+                  iglecristianalugarderefugio@gmail.com
                   </a>
                 </div>
               </div>
@@ -148,10 +148,10 @@ export function Footer() {
               © 2025 Lugar de Refugio. Todos los derechos reservados.
             </div>
             <div className="flex gap-6 text-sm text-gray-400">
-              <Link to="/privacidad" className="hover:text-white transition-colors">
+              <Link to="/nosotros" className="hover:text-white transition-colors">
                 Política de Privacidad
               </Link>
-              <Link to="/terminos" className="hover:text-white transition-colors">
+              <Link to="/nosotros" className="hover:text-white transition-colors">
                 Términos de Uso
               </Link>
             </div>

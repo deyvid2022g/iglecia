@@ -1,107 +1,27 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, Download, Share2, Clock, Tag, Search, Heart, MessageCircle } from 'lucide-react';
+import { useSermons } from '../hooks/useSermons';
 
-export function SermonsPage() {
-  // Renamed from SermonsPage but keeping the same function name for compatibility
+export function PredicasPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [selectedSpeaker, setSelectedSpeaker] = useState('');
-  // Define interfaces for sermon data
-  interface Sermon {
-    id: number;
-    slug: string;
-    title: string;
-    speaker: string;
-    date: string;
-    duration: string;
-    thumbnail: string;
-    description: string;
-    tags: string[];
-    videoUrl: string;
-    audioUrl: string;
-    hasTranscript: boolean;
-    viewCount: number;
-  }
-
+  
   // Define types for likes and comments
-  type LikesMap = Record<number, number>;
-  type CommentsMap = Record<number, number>;
+  type LikesMap = Record<string, number>;
+  type CommentsMap = Record<string, number>;
 
   const [sermonLikes, setSermonLikes] = useState<LikesMap>({});
   const [sermonComments, setSermonComments] = useState<CommentsMap>({});
 
-  const sermons = [
-    {
-      id: 1,
-      slug: 'fe-que-transforma',
-      title: 'Diseñados para la Gloria de Dios',
-      speaker: 'Pastor Juan Pérez',
-      date: '2025-01-06',
-      duration: '38:20',
-      thumbnail: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
-      description: 'Descubre tu identidad divina y camina en la excelencia para la cual fuiste creado. Un mensaje profético sobre el diseño original de Dios para tu vida.',
-      tags: ['identidad', 'propósito', 'gloria'],
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      audioUrl: '/audio/sermon-001.mp3',
-      hasTranscript: true,
-      viewCount: 1204
-    },
-    {
-      id: 2,
-      slug: 'amor-y-servicio',
-      title: 'El Corazón del Padre Revelado',
-      speaker: 'Pastora María Gómez',
-      date: '2025-01-13',
-      duration: '35:15',
-      thumbnail: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
-      description: 'Una revelación poderosa del amor incondicional del Padre celestial y cómo este amor transforma nuestra manera de servir y amar a otros.',
-      tags: ['amor paternal', 'servicio', 'revelación'],
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      audioUrl: '/audio/sermon-002.mp3',
-      hasTranscript: true,
-      viewCount: 892
-    },
-    {
-      id: 3,
-      slug: 'esperanza-en-tiempos-dificiles',
-      title: 'Inquebrantables en Su Fidelidad',
-      speaker: 'Pastor Juan Pérez',
-      date: '2025-01-20',
-      duration: '42:10',
-      thumbnail: 'https://images.pexels.com/photos/289586/pexels-photo-289586.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
-      description: 'Cuando las circunstancias desafían tu fe, descubre cómo mantenerte firme en las promesas eternas de Dios. Un mensaje de victoria y esperanza profética.',
-      tags: ['fidelidad', 'victoria', 'promesas'],
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      audioUrl: '/audio/sermon-003.mp3',
-      hasTranscript: true,
-      viewCount: 1567
-    },
-    {
-      id: 4,
-      slug: 'el-perdon-que-libera',
-      title: 'Libertad Sobrenatural del Perdón',
-      speaker: 'Pastor Carlos Ruiz',
-      date: '2025-01-27',
-      duration: '29:45',
-      thumbnail: 'https://images.pexels.com/photos/1000445/pexels-photo-1000445.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
-      description: 'El perdón no es solo una decisión, es un acto sobrenatural que libera el poder de Dios en tu vida. Descubre cómo caminar en libertad total.',
-      tags: ['perdón', 'libertad', 'sanidad interior'],
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      audioUrl: '/audio/sermon-004.mp3',
-      hasTranscript: false,
-      viewCount: 723
-    }
-  ];
-
-  // const allTags = [...new Set(sermons.flatMap(sermon => sermon.tags))];
-  // const allSpeakers = [...new Set(sermons.map(sermon => sermon.speaker))];
-
+  const { sermons } = useSermons({ published: true });
+  
   const filteredSermons = sermons.filter(sermon => {
     const matchesSearch = sermon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          sermon.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sermon.speaker.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = !selectedTag || sermon.tags.includes(selectedTag);
+                         sermon.speaker?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTag = !selectedTag || (sermon.tags?.includes(selectedTag) ?? false);
     const matchesSpeaker = !selectedSpeaker || sermon.speaker === selectedSpeaker;
     
     return matchesSearch && matchesTag && matchesSpeaker;
@@ -128,13 +48,13 @@ export function SermonsPage() {
     const initialComments: CommentsMap = {};
     
     sermons.forEach(sermon => {
-      initialLikes[sermon.id] = Math.floor(Math.random() * 50) + 10; // Random likes between 10-59
-      initialComments[sermon.id] = Math.floor(Math.random() * 10) + 1; // Random comments between 1-10
+      initialLikes[Number(sermon.id)] = Math.floor(Math.random() * 50) + 10; // Random likes between 10-59
+      initialComments[Number(sermon.id)] = Math.floor(Math.random() * 10) + 1; // Random comments between 1-10
     });
     
     setSermonLikes(initialLikes);
     setSermonComments(initialComments);
-  }, []);
+  }, [sermons]);
   
   // Function to handle liking a sermon
   const handleLike = (sermonId: number) => {
@@ -148,11 +68,11 @@ export function SermonsPage() {
   };
   
   // Function to share a sermon
-  const shareSermon = (sermon: Sermon) => {
+  const shareSermon = (sermon: { title: string; speaker_name: string; slug: string }) => {
     if (navigator.share) {
       navigator.share({
         title: sermon.title,
-        text: `Te recomiendo escuchar esta prédica: ${sermon.title} por ${sermon.speaker}`,
+        text: `Te recomiendo escuchar esta prédica: ${sermon.title} por ${sermon.speaker_name}`,
         url: window.location.origin + '/predicas/' + sermon.slug
       })
       .catch((error) => console.log('Error compartiendo:', error));
@@ -250,14 +170,14 @@ export function SermonsPage() {
                 <article key={sermon.id} className="card group">
                   <div className="aspect-video relative overflow-hidden rounded-lg mb-4">
                     <img
-                      src={sermon.thumbnail}
+                      src={sermon.thumbnail_url || '/default-sermon-thumbnail.jpg'}
                       alt={`Portada del sermón: ${sermon.title}`}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <Link
-                        to={`/sermones/${sermon.slug}`}
+                        to={`/predicas/${sermon.slug}`}
                         className="bg-white rounded-full p-4 hover:bg-gray-100 transition-colors focus-ring"
                         aria-label={`Reproducir sermón: ${sermon.title}`}
                       >
@@ -283,9 +203,9 @@ export function SermonsPage() {
                       <div className="flex items-center text-gray-600 text-sm space-x-4 mb-3">
                         <span>{sermon.speaker}</span>
                         <span>•</span>
-                        <span>{formatDate(sermon.date)}</span>
+                        <span>{formatDate(sermon.sermon_date)}</span>
                         <span>•</span>
-                        <span>{sermon.viewCount.toLocaleString()} visualizaciones</span>
+                        <span>{sermon.view_count?.toLocaleString() || 0} visualizaciones</span>
                       </div>
                     </div>
 
@@ -294,7 +214,7 @@ export function SermonsPage() {
                     </p>
 
                     <div className="flex flex-wrap gap-2">
-                      {sermon.tags.map((tag) => (
+                      {sermon.tags?.map((tag) => (
                         <button
                           key={tag}
                           onClick={() => setSelectedTag(tag)}
@@ -315,7 +235,7 @@ export function SermonsPage() {
                           <Play className="w-4 h-4 mr-2" />
                           Ver completo
                         </Link>
-                        {sermon.hasTranscript && (
+                        {sermon.has_transcript && (
                           <span className="inline-flex items-center text-gray-600 text-sm">
                             📄 Transcripción disponible
                           </span>
@@ -323,7 +243,7 @@ export function SermonsPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleLike(sermon.id)}
+                          onClick={() => handleLike(Number(sermon.id))}
                           className="p-2 text-gray-600 hover:text-red-500 hover:bg-gray-100 rounded-lg transition-colors focus-ring flex items-center"
                           aria-label="Me gusta"
                         >
@@ -339,13 +259,17 @@ export function SermonsPage() {
                           <span className="text-sm">{sermonComments[sermon.id] || 0}</span>
                         </Link>
                         <button
-                          onClick={() => shareSermon(sermon)}
+                          onClick={() => shareSermon({ 
+                            title: sermon.title,
+                            speaker_name: sermon.speaker || '',
+                            slug: sermon.slug
+                          })}
                           className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors focus-ring"
                           aria-label="Compartir sermón"
                         >
                           <Share2 className="w-4 h-4" />
                         </button>
-                        {sermon.audioUrl && (
+                        {sermon.audio_url && (
                           <button
                             className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors focus-ring"
                             aria-label="Descargar audio"
@@ -366,44 +290,22 @@ export function SermonsPage() {
       {/* Featured Speakers */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4 sm:px-6">
-          <h2 className="text-3xl font-bold text-center mb-12">Nuestros Predicadores</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <h3 className="text-xl font-semibold mb-2">Pastor Juan Pérez</h3>
-            <p className="text-gray-600 mb-4">Pastor Principal</p>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Con más de 15 años de ministerio, el Pastor Juan comparte mensajes 
-              profundos con aplicación práctica para la vida diaria.
-            </p>
-            
-            <div className="text-center">
-              <div className="w-32 h-32 rounded-full mx-auto mb-4 overflow-hidden bg-gray-100">
+          <h2 className="text-3xl font-bold text-center mb-12">Nuestro Pastor</h2>
+          <div className="flex justify-center">
+            <div className="text-center max-w-md">
+              <div className="w-48 h-48 rounded-full mx-auto mb-6 overflow-hidden bg-gray-100">
                 <img
-                  src="https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&fit=crop"
-                  alt="Pastora María Gómez"
+                  src="/Pastor Reynel Dueñas P n g.png"
+                  alt="Pastor Reynel Dueñas"
                   className="w-full h-full object-cover"
                 />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Pastora María Gómez</h3>
-              <p className="text-gray-600 mb-4">Pastora Asociada</p>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Especializada en ministerio familiar y de mujeres, la Pastora María 
-                trae perspectivas únicas sobre la fe en el hogar.
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-32 h-32 rounded-full mx-auto mb-4 overflow-hidden bg-gray-100">
-                <img
-                  src="https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=300&h=300&fit=crop"
-                  alt="Pastor Carlos Ruiz"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Pastor Carlos Ruiz</h3>
-              <p className="text-gray-600 mb-4">Pastor de Jóvenes</p>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Líder dinámico del ministerio juvenil, el Pastor Carlos conecta 
-                con las nuevas generaciones a través de mensajes relevantes.
+              <h3 className="text-2xl font-semibold mb-2">Pastor Reynel Dueñas</h3>
+              <p className="text-gray-600 mb-4">Pastor Principal</p>
+              <p className="text-gray-600 leading-relaxed">
+                Con una pasión profunda por la Palabra de Dios, el Pastor Reynel Dueñas 
+                comparte mensajes transformadores que impactan vidas y fortalecen la fe 
+                de nuestra congregación.
               </p>
             </div>
           </div>

@@ -7,7 +7,6 @@ import {
   Users,
   User,
   Share2,
-  Download,
   ChevronLeft,
   ExternalLink,
   Check,
@@ -15,6 +14,7 @@ import {
   Heart,
   MessageCircle
 } from 'lucide-react';
+import { useEvent } from '../hooks/useEvents';
 
 // Definir interfaz para los comentarios
 interface Comment {
@@ -25,7 +25,8 @@ interface Comment {
 }
 
 export function EventDetailPage() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
+  const { event, loading, error } = useEvent(slug || '');
   const [showRSVPForm, setShowRSVPForm] = useState(false);
   const [rsvpSubmitted, setRsvpSubmitted] = useState(false);
   const [formData, setFormData] = useState({
@@ -43,58 +44,7 @@ export function EventDetailPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
 
-  // Simulated event data - in real app this would come from an API
-  const event = {
-    id: 2,
-    title: 'Taller para Matrimonios',
-    date: '2025-02-08',
-    startTime: '15:00',
-    endTime: '18:00',
-    type: 'Evento Especial',
-    location: {
-      name: 'Salón de Eventos',
-      address: 'Sede Norte - Salón A',
-      fullAddress: 'Barranquilla, Colombia',
-      coordinates: { lat: 10.9685, lng: -74.7813 }
-    },
-    description: 'Un taller intensivo diseñado especialmente para matrimonios que desean fortalecer su relación con bases bíblicas sólidas. Durante estas tres horas exploraremos temas fundamentales como la comunicación efectiva, la resolución de conflictos, el manejo de las finanzas familiares y cómo mantener viva la chispa del amor a lo largo de los años.',
-    detailedDescription: `Este taller está dirigido a matrimonios de todas las edades y etapas de su relación. No importa si son recién casados o llevan décadas juntos, siempre hay algo nuevo que aprender para fortalecer el vínculo matrimonial.
 
-**Temas a cubrir:**
-• Comunicación asertiva y empática
-• Manejo constructivo de conflictos
-• Administración sabia de recursos familiares  
-• Intimidad emocional y espiritual
-• Construcción de tradiciones familiares
-• Crianza en equipo (para parejas con hijos)
-
-**Metodología:**
-Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja y tiempo de reflexión personal. Cada pareja recibirá un manual de trabajo que podrán llevar a casa para continuar aplicando lo aprendido.
-
-**Material incluido:**
-• Manual de trabajo (40 páginas)
-• Plantillas para planificación financiera familiar
-• Guía de comunicación efectiva
-• Refrigerio y café durante el descanso`,
-    capacity: 50,
-    registrations: 32,
-    availableSpots: 18,
-    image: 'https://images.pexels.com/photos/1024993/pexels-photo-1024993.jpeg?auto=compress&cs=tinysrgb&w=1200&h=600&fit=crop',
-    host: 'Pastores Juan y María Pérez',
-    hostBio: 'Los pastores Juan y María llevan 20 años casados y 15 años en el ministerio matrimonial. Han ayudado a cientos de parejas a fortalecer sus relaciones y son autores del libro "Matrimonio que Perdura".',
-    requiresRSVP: true,
-    cost: 'Gratuito',
-    requirements: [
-      'Asistir en pareja (ambos cónyuges)',
-      'Traer libreta para notas',
-      'Actitud abierta al aprendizaje'
-    ],
-    tags: ['matrimonio', 'relaciones', 'familia', 'comunicación'],
-    contact: {
-      phone: '+57 302 494 1293',
-      email: 'eventos@iglesiavidanueva.com'
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-ES', {
@@ -159,8 +109,8 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
         await navigator.clipboard.writeText(window.location.href);
         alert('Enlace copiado al portapapeles');
       }
-    } catch (error) {
-      console.error('Error al compartir:', error);
+    } catch (_) {
+      console.error('Error al compartir:', _);
     }
   };
 
@@ -181,18 +131,45 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
   };
 
   const addToCalendar = () => {
-    const startDateTime = new Date(`${event.date}T${event.startTime}`);
-    const endDateTime = new Date(`${event.date}T${event.endTime}`);
+    const startDateTime = new Date(`${event.event_date}T${event.start_time}`);
+    const endDateTime = new Date(`${event.event_date}T${event.end_time}`);
     
-    const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDateTime.toISOString().replace(/[-:]/g, '').split('.')[0]}Z/${endDateTime.toISOString().replace(/[-:]/g, '').split('.')[0]}Z&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.location.fullAddress)}`;
+    const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDateTime.toISOString().replace(/[-:]/g, '').split('.')[0]}Z/${endDateTime.toISOString().replace(/[-:]/g, '').split('.')[0]}Z&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.locations?.full_address || event.locations?.name || 'Ubicación por confirmar')}`;
     
     window.open(calendarUrl, '_blank');
   };
 
   const openMap = () => {
-    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location.fullAddress)}`;
+    const address = event.locations?.full_address || event.locations?.name || 'Ubicación por confirmar';
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     window.open(mapUrl, '_blank');
   };
+
+  // Mostrar estado de carga
+  if (loading) {
+    return (
+      <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando evento...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar estado de error
+  if (error) {
+    return (
+      <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error al cargar evento: {error}</p>
+          <Link to="/eventos" className="btn-primary">
+            Volver a eventos
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -239,7 +216,7 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
       {/* Hero Image */}
       <section className="relative h-64 md:h-96">
         <img
-          src={event.image}
+          src={event.image_url || 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=1200&h=600&fit=crop'}
           alt={`Imagen del evento: ${event.title}`}
           className="w-full h-full object-cover"
         />
@@ -261,21 +238,21 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <Calendar className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-                  <div className="text-sm font-medium">{formatDate(event.date)}</div>
+                  <div className="text-sm font-medium">{formatDate(event.event_date)}</div>
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <Clock className="w-6 h-6 mx-auto mb-2 text-gray-600" />
                   <div className="text-sm font-medium">
-                    {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                    {formatTime(event.start_time)} - {formatTime(event.end_time)}
                   </div>
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <MapPin className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-                  <div className="text-sm font-medium">{event.location.name}</div>
+                  <div className="text-sm font-medium">{event.locations?.name || 'Ubicación por confirmar'}</div>
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <Users className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-                  <div className="text-sm font-medium">{event.availableSpots} lugares disponibles</div>
+                  <div className="text-sm font-medium">{event.capacity ? (event.capacity - (event.current_registrations || 0)) : 'Sin límite'} lugares disponibles</div>
                 </div>
               </div>
 
@@ -283,41 +260,16 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
               <div className="mb-8">
                 <h2 className="text-2xl font-bold mb-4">Descripción del evento</h2>
                 <div className="prose prose-gray max-w-none">
-                  {event.detailedDescription.split('\n\n').map((paragraph, index) => (
-                    <div key={index} className="mb-4">
-                      {paragraph.startsWith('**') && paragraph.endsWith('**') ? (
-                        <h3 className="text-lg font-semibold mb-2">
-                          {paragraph.slice(2, -2)}
-                        </h3>
-                      ) : paragraph.startsWith('•') ? (
-                        <ul className="list-disc list-inside space-y-1 ml-4">
-                          {paragraph.split('\n').map((item, itemIndex) => (
-                            <li key={itemIndex} className="text-gray-700">
-                              {item.replace('• ', '')}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-gray-700 leading-relaxed">{paragraph}</p>
-                      )}
-                    </div>
-                  ))}
+                  <p className="text-gray-700 leading-relaxed">{event.description}</p>
                 </div>
               </div>
 
               {/* Requirements */}
-              {event.requirements.length > 0 && (
+              {event.requirements && (
                 <div className="mb-8">
                   <h3 className="text-xl font-bold mb-4">Requisitos</h3>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <ul className="space-y-2">
-                      {event.requirements.map((requirement, index) => (
-                        <li key={index} className="flex items-start">
-                          <Check className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700">{requirement}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="text-gray-700">{event.requirements}</p>
                   </div>
                 </div>
               )}
@@ -371,29 +323,31 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
                       </p>
                     </div>
                   </div>
-                ) : event.requiresRSVP ? (
+                ) : event.requires_rsvp ? (
                   <div className="card">
                     <h3 className="text-lg font-semibold mb-4">Inscripción</h3>
                     
-                    <div className="mb-4">
-                      <div className="flex justify-between text-sm text-gray-600 mb-2">
-                        <span>Lugares ocupados</span>
-                        <span>{event.registrations}/{event.capacity}</span>
+                    {event.capacity && (
+                      <div className="mb-4">
+                        <div className="flex justify-between text-sm text-gray-600 mb-2">
+                          <span>Lugares ocupados</span>
+                          <span>{event.current_registrations || 0}/{event.capacity}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-black h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${((event.current_registrations || 0) / event.capacity) * 100}%`
+                            }}
+                          ></div>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-2">
+                          {event.capacity - (event.current_registrations || 0)} lugares disponibles
+                        </p>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-black h-2 rounded-full transition-all duration-300"
-                          style={{
-                            width: `${(event.registrations / event.capacity) * 100}%`
-                          }}
-                        ></div>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-2">
-                        {event.availableSpots} lugares disponibles
-                      </p>
-                    </div>
+                    )}
 
-                    {event.availableSpots > 0 ? (
+                    {!event.capacity || (event.capacity - (event.current_registrations || 0)) > 0 ? (
                       <button
                         onClick={() => setShowRSVPForm(true)}
                         className="btn-primary w-full mb-4"
@@ -447,31 +401,37 @@ Combinaremos enseñanza bíblica con dinámicas prácticas, ejercicios en pareja
                 </div>
 
                 {/* Contact Info */}
-                <div className="card">
-                  <h3 className="text-lg font-semibold mb-4">Información de contacto</h3>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <strong>Teléfono:</strong>
-                      <br />
-                      <a 
-                        href={`tel:${event.contact.phone}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {event.contact.phone}
-                      </a>
-                    </div>
-                    <div>
-                      <strong>Email:</strong>
-                      <br />
-                      <a 
-                        href={`mailto:${event.contact.email}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {event.contact.email}
-                      </a>
+                {(event.contact_phone || event.contact_email) && (
+                  <div className="card">
+                    <h3 className="text-lg font-semibold mb-4">Información de contacto</h3>
+                    <div className="space-y-3 text-sm">
+                      {event.contact_phone && (
+                        <div>
+                          <strong>Teléfono:</strong>
+                          <br />
+                          <a 
+                            href={`tel:${event.contact_phone}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {event.contact_phone}
+                          </a>
+                        </div>
+                      )}
+                      {event.contact_email && (
+                        <div>
+                          <strong>Email:</strong>
+                          <br />
+                          <a 
+                            href={`mailto:${event.contact_email}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {event.contact_email}
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>

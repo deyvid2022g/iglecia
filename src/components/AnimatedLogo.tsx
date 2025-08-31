@@ -62,13 +62,13 @@ export function AnimatedLogo({ className = '' }: AnimatedLogoProps) {
   return (
     <img
       ref={logoRef}
-      src="/trabajo.png"
+      src="/nuevo-logo.png.png"
       alt="Lugar de Refugio"
-      className={`w-10 h-10 object-contain ${className}`}
+      className={`w-11 h-11 object-contain ${className}`}
       onError={(e) => {
         const target = e.target as HTMLImageElement;
         target.onerror = null;
-        target.style.display = 'none';
+        target.src = '/trabajo.png';
       }}
     />
   );

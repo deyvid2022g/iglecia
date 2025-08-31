@@ -7,41 +7,20 @@ import {
   Users, 
   Filter,
   Search,
-  ChevronLeft,
-  ChevronRight,
   Heart,
   MessageCircle,
   Share2
 } from 'lucide-react';
 import { AnimatedCard } from '../components/AnimatedCard';
-
-// Definir tipos para los eventos
-interface Event {
-  id: number;
-  slug: string;
-  title: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  type: string;
-  location: {
-    name: string;
-    address: string;
-  };
-  description: string;
-  capacity: number;
-  registrations: number;
-  image: string;
-  host: string;
-  requiresRSVP: boolean;
-}
+import { useEvents } from '../hooks/useEvents';
+import { Event } from '../lib/supabase';
 
 // Definir tipos para los likes y comentarios
-type LikesMap = Record<number, number>;
-type CommentsMap = Record<number, number>;
+type LikesMap = Record<string, number>;
+type CommentsMap = Record<string, number>;
 
 export function EventsPage() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [_currentDate, _setCurrentDate] = useState(new Date());
   const [selectedType, setSelectedType] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list');
@@ -50,25 +29,30 @@ export function EventsPage() {
   const [eventLikes, setEventLikes] = useState<LikesMap>({});
   const [eventComments, setEventComments] = useState<CommentsMap>({});
 
+  // Usar el hook de eventos
+  const { events, loading, error } = useEvents({ published: true });
+
   const eventTypes = ['Culto', 'Niños', 'Jóvenes', 'Grupo Pequeño', 'Evento Especial'];
   
   // Inicializar likes y comentarios
   useEffect(() => {
-    // Simular datos iniciales
-    const initialLikes: LikesMap = {};
-    const initialComments: CommentsMap = {};
-    
-    events.forEach(event => {
-      initialLikes[event.id] = Math.floor(Math.random() * 50);
-      initialComments[event.id] = Math.floor(Math.random() * 10);
-    });
-    
-    setEventLikes(initialLikes);
-    setEventComments(initialComments);
-  }, []);
+    if (events.length > 0) {
+      // Simular datos iniciales
+      const initialLikes: LikesMap = {};
+      const initialComments: CommentsMap = {};
+      
+      events.forEach(event => {
+        initialLikes[event.id] = Math.floor(Math.random() * 50);
+        initialComments[event.id] = Math.floor(Math.random() * 10);
+      });
+      
+      setEventLikes(initialLikes);
+      setEventComments(initialComments);
+    }
+  }, [events]);
   
   // Función para manejar los likes
-  const handleLike = (eventId: number) => {
+  const handleLike = (eventId: string) => {
     setEventLikes(prev => {
       const currentLikes = prev[eventId] || 0;
       return {
@@ -86,7 +70,7 @@ export function EventsPage() {
         text: `Te invito a este evento: ${event.title}`,
         url: window.location.origin + '/eventos/' + event.slug
       })
-      .catch((error) => console.log('Error compartiendo:', error));
+      .catch((_) => console.log('Error compartiendo:', _));
     } else {
       // Fallback para navegadores que no soportan Web Share API
       const dummyInput = document.createElement('input');
@@ -99,108 +83,12 @@ export function EventsPage() {
     }
   };
 
-  const events = [
-    {
-      id: 1,
-      slug: 'culto-dominical-febrero-2',
-      title: 'Culto Dominical',
-      date: '2025-02-02',
-      startTime: '10:00',
-      endTime: '12:00',
-      type: 'Culto',
-      location: {
-        name: 'Lugar de Refugio',
-        address: 'Barranquilla'
-      },
-      description: 'Culto dominical con alabanza, adoración y mensaje inspirador.',
-      capacity: 300,
-      registrations: 85,
-      image: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop',
-      host: 'Pastor Juan Pérez',
-      requiresRSVP: false
-    },
-    {
-      id: 2,
-      slug: 'taller-matrimonios',
-      title: 'Taller para Matrimonios',
-      date: '2025-02-08',
-      startTime: '15:00',
-      endTime: '18:00',
-      type: 'Evento Especial',
-      location: {
-        name: 'Salón de Eventos',
-        address: 'Sede Norte - Salón A'
-      },
-      description: 'Taller intensivo para fortalecer las relaciones matrimoniales con bases bíblicas.',
-      capacity: 50,
-      registrations: 32,
-      image: 'https://images.pexels.com/photos/1024993/pexels-photo-1024993.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop',
-      host: 'Pastores Juan y María',
-      requiresRSVP: true
-    },
-    {
-      id: 3,
-      slug: 'encuentro-juvenil',
-      title: 'Encuentro Juvenil',
-      date: '2025-02-14',
-      startTime: '19:00',
-      endTime: '21:30',
-      type: 'Jóvenes',
-      location: {
-        name: 'Centro Juvenil',
-        address: 'Sede Norte - Piso 2'
-      },
-      description: 'Noche especial de San Valentín con dinámicas, música y mensaje sobre el amor verdadero.',
-      capacity: 80,
-      registrations: 64,
-      image: 'https://images.pexels.com/photos/1708936/pexels-photo-1708936.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop',
-      host: 'Pastor Carlos Ruiz',
-      requiresRSVP: true
-    },
-    {
-      id: 4,
-      slug: 'escuela-biblica-infantil',
-      title: 'Escuela Bíblica Infantil',
-      date: '2025-02-09',
-      startTime: '09:00',
-      endTime: '11:00',
-      type: 'Niños',
-      location: {
-        name: 'Salón Infantil',
-        address: 'Sede Principal - Piso 1'
-      },
-      description: 'Clase especial para niños con actividades didácticas, juegos y enseñanza bíblica.',
-      capacity: 40,
-      registrations: 23,
-      image: 'https://images.pexels.com/photos/8613049/pexels-photo-8613049.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop',
-      host: 'Maestra Elena Vásquez',
-      requiresRSVP: true
-    },
-    {
-      id: 5,
-      slug: 'retiro-espiritual',
-      title: 'Retiro Espiritual de Fin de Semana',
-      date: '2025-02-22',
-      startTime: '08:00',
-      endTime: '18:00',
-      type: 'Evento Especial',
-      location: {
-        name: 'Centro de Retiros El Refugio',
-        address: 'Vía Santa Marta, Km 15'
-      },
-      description: 'Retiro de dos días para renovación espiritual, incluye comidas y hospedaje.',
-      capacity: 60,
-      registrations: 45,
-      image: 'https://images.pexels.com/photos/247851/pexels-photo-247851.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop',
-      host: 'Equipo Pastoral',
-      requiresRSVP: true
-    }
-  ];
+
 
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.host.toLowerCase().includes(searchTerm.toLowerCase());
+                         (event.host && event.host.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesType = !selectedType || event.type === selectedType;
     
     return matchesSearch && matchesType;
@@ -222,6 +110,35 @@ export function EventsPage() {
       hour12: true
     });
   };
+
+  // Mostrar estado de carga
+  if (loading) {
+    return (
+      <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando eventos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar estado de error
+  if (error) {
+    return (
+      <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error al cargar eventos: {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="btn-primary"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const getEventTypeColor = (type: string) => {
     const colors: { [key: string]: string } = {
@@ -363,7 +280,7 @@ export function EventsPage() {
                     <div className="lg:col-span-1">
                       <div className="aspect-video lg:aspect-square rounded-lg overflow-hidden">
                         <img
-                          src={event.image}
+                          src={event.image_url || 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop'}
                           alt={`Imagen del evento: ${event.title}`}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
@@ -378,7 +295,7 @@ export function EventsPage() {
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${getEventTypeColor(event.type)}`}>
                             {event.type}
                           </span>
-                          {event.requiresRSVP && (
+                          {event.requires_rsvp && (
                             <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
                               Requiere inscripción
                             </span>
@@ -400,20 +317,20 @@ export function EventsPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div className="flex items-center text-gray-600">
                           <CalendarIcon className="w-4 h-4 mr-2" />
-                          <span>{formatDate(event.date)}</span>
+                          <span>{formatDate(event.event_date)}</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Clock className="w-4 h-4 mr-2" />
-                          <span>{formatTime(event.startTime)} - {formatTime(event.endTime)}</span>
+                          <span>{formatTime(event.start_time)} - {formatTime(event.end_time)}</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <MapPin className="w-4 h-4 mr-2" />
-                          <span>{event.location.name}</span>
+                          <span>{event.locations?.name || 'Ubicación por confirmar'}</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Users className="w-4 h-4 mr-2" />
                           <span>
-                            {event.registrations}/{event.capacity} inscritos
+                            {event.current_registrations}/{event.capacity || 'Sin límite'} inscritos
                           </span>
                         </div>
                       </div>
@@ -433,7 +350,7 @@ export function EventsPage() {
                           Ver detalles
                         </Link>
                         
-                        {event.requiresRSVP && (
+                        {event.requires_rsvp && (
                           <button className="btn-secondary w-full">
                             Inscribirse
                           </button>
@@ -472,17 +389,17 @@ export function EventsPage() {
                       </div>
 
                       {/* Capacity Indicator */}
-                      {event.requiresRSVP && (
+                      {event.requires_rsvp && event.capacity && (
                         <div className="mt-4">
                           <div className="flex justify-between text-sm text-gray-600 mb-1">
                             <span>Inscripciones</span>
-                            <span>{Math.round((event.registrations / event.capacity) * 100)}%</span>
+                            <span>{Math.round(((event.current_registrations || 0) / event.capacity) * 100)}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-black h-2 rounded-full transition-all duration-300"
                               style={{
-                                width: `${(event.registrations / event.capacity) * 100}%`
+                                width: `${((event.current_registrations || 0) / event.capacity) * 100}%`
                               }}
                             ></div>
                           </div>

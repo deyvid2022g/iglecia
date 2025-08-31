@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 
 interface HeroLogoProps {
   className?: string;
 }
 
-export function HeroLogo({ className = '' }: HeroLogoProps) {
+export function HeroLogo({ className: _className = '' }: HeroLogoProps) {
   const logoRef = useRef<HTMLImageElement>(null);
   
   useEffect(() => {

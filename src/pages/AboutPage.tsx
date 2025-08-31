@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Users, BookOpen, Heart, Target, MapPin, Phone, Mail } from 'lucide-react';
+import { Users, Heart, MapPin, Phone, Mail } from 'lucide-react';
 
 export function AboutPage() {
   return (
@@ -71,51 +71,11 @@ export function AboutPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               <div className="card text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Heart className="w-8 h-8 text-gray-700" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Alabanza</h3>
-                <p className="text-gray-600 text-sm">
-                  Adoración y música para glorificar a Dios
-                </p>
-              </div>
-              
-              <div className="card text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-gray-700" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Danza</h3>
-                <p className="text-gray-600 text-sm">
-                  Expresión artística como forma de adoración
-                </p>
-              </div>
-              
-              <div className="card text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="w-8 h-8 text-gray-700" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Zona Kids</h3>
                 <p className="text-gray-600 text-sm">
-                  Formación espiritual para los más pequeños
-                </p>
-              </div>
-              
-              <div className="card text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-gray-700" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Familias</h3>
-                <p className="text-gray-600 text-sm">
-                  Fortalecimiento de los hogares cristianos
-                </p>
-              </div>
-              
-              <div className="card text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-gray-700" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Parejas</h3>
-                <p className="text-gray-600 text-sm">
-                  Apoyo y consejería para matrimonios
+                  Formando pequeños discípulos con corazón de adoradores
                 </p>
               </div>
               
@@ -125,7 +85,47 @@ export function AboutPage() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Jóvenes</h3>
                 <p className="text-gray-600 text-sm">
-                  Formación y actividades para la nueva generación
+                  Jóvenes apasionados viviendo el llamado de Dios
+                </p>
+              </div>
+              
+              <div className="card text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-gray-700" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Familias</h3>
+                <p className="text-gray-600 text-sm">
+                  Fortaleciendo el núcleo familiar según principios bíblicos
+                </p>
+              </div>
+              
+              <div className="card text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-gray-700" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Parejas</h3>
+                <p className="text-gray-600 text-sm">
+                  Construyendo matrimonios sólidos en Cristo
+                </p>
+              </div>
+              
+              <div className="card text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Heart className="w-8 h-8 text-gray-700" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Alabanza</h3>
+                <p className="text-gray-600 text-sm">
+                  Adorando a Dios con excelencia y pasión
+                </p>
+              </div>
+              
+              <div className="card text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-gray-700" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Danza</h3>
+                <p className="text-gray-600 text-sm">
+                  Expresando adoración a través del movimiento
                 </p>
               </div>
               
@@ -135,7 +135,7 @@ export function AboutPage() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Producción</h3>
                 <p className="text-gray-600 text-sm">
-                  Tecnología y medios para expandir el mensaje
+                  Sirviendo con excelencia técnica para la gloria de Dios
                 </p>
               </div>
               
@@ -145,7 +145,7 @@ export function AboutPage() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Caballeros</h3>
                 <p className="text-gray-600 text-sm">
-                  Formación de hombres con carácter de Cristo
+                  Formando hombres íntegros según el corazón de Dios
                 </p>
               </div>
               
@@ -155,7 +155,7 @@ export function AboutPage() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Mujeres</h3>
                 <p className="text-gray-600 text-sm">
-                  Empoderamiento y crecimiento espiritual femenino
+                  Desarrollando mujeres virtuosas y de propósito
                 </p>
               </div>
             </div>
@@ -198,7 +198,7 @@ export function AboutPage() {
       </section>
 
       {/* Soy Nuevo */}
-      <section className="py-16 bg-white">
+      <section id="soy-nuevo" className="py-16 bg-white">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl font-bold mb-8 text-center">Soy Nuevo</h2>
