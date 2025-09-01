@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Calendar as CalendarIcon, 
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { AnimatedCard } from '../components/AnimatedCard';
 import { useEvents } from '../hooks/useEvents';
-import { Event } from '../lib/supabase';
+import { Event } from '../hooks/useEvents';
 
 // Definir tipos para los likes y comentarios
 type LikesMap = Record<string, number>;
@@ -103,7 +103,8 @@ export function EventsPage() {
     });
   };
 
-  const formatTime = (time: string) => {
+  const formatTime = (time: string | undefined) => {
+    if (!time) return 'Hora por confirmar';
     return new Date(`2000-01-01T${time}`).toLocaleTimeString('es-ES', {
       hour: '2-digit',
       minute: '2-digit',
@@ -325,7 +326,7 @@ export function EventsPage() {
                         </div>
                         <div className="flex items-center text-gray-600">
                           <MapPin className="w-4 h-4 mr-2" />
-                          <span>{event.locations?.name || 'Ubicación por confirmar'}</span>
+                          <span>Ubicación por confirmar</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Users className="w-4 h-4 mr-2" />

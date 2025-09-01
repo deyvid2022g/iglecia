@@ -1,4 +1,14 @@
-import { supabase } from '../lib/supabase';
+import { useState } from 'react';
+import { 
+  ref, 
+  uploadBytes, 
+  uploadBytesResumable, 
+  getDownloadURL, 
+  deleteObject, 
+  listAll, 
+  getMetadata 
+} from 'firebase/storage';
+import { storage } from '../lib/firebase';
 import { resizeImage } from './utilsService';
 import { validateFile } from './validationService';
 
@@ -128,30 +138,37 @@ export const uploadFile = async (
 
     onProgress?.(50);
 
-    // Subir archivo a Supabase Storage
-    const { data: _, error } = await supabase.storage
-      .from(options.bucket)
-      .upload(filePath, fileToUpload, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    // Crear referencia al archivo en Firebase Storage
+    const fileRef = ref(storage, `${options.bucket}/${filePath}`);
 
-    if (error) {
-      throw error;
+    // Subir archivo a Firebase Storage con progreso
+    if (onProgress) {
+      const uploadTask = uploadBytesResumable(fileRef, fileToUpload);
+      
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            const progress = 50 + (snapshot.bytesTransferred / snapshot.totalBytes) * 30;
+            onProgress(progress);
+          },
+          (error) => reject(error),
+          () => resolve()
+        );
+      });
+    } else {
+      await uploadBytes(fileRef, fileToUpload);
     }
 
     onProgress?.(80);
 
-    // Obtener URL pública del archivo
-    const { data: urlData } = supabase.storage
-      .from(options.bucket)
-      .getPublicUrl(filePath);
+    // Obtener URL de descarga del archivo
+    const downloadURL = await getDownloadURL(fileRef);
 
     onProgress?.(100);
 
     return {
       success: true,
-      url: urlData.publicUrl,
+      url: downloadURL,
       path: filePath
     };
 
@@ -186,14 +203,8 @@ export const uploadMultipleFiles = async (
 // Función para eliminar archivo
 export const deleteFile = async (bucket: string, filePath: string): Promise<boolean> => {
   try {
-    const { error } = await supabase.storage
-      .from(bucket)
-      .remove([filePath]);
-
-    if (error) {
-      throw error;
-    }
-
+    const fileRef = ref(storage, `${bucket}/${filePath}`);
+    await deleteObject(fileRef);
     return true;
   } catch (error) {
     console.error('Error al eliminar archivo:', error);
@@ -201,24 +212,17 @@ export const deleteFile = async (bucket: string, filePath: string): Promise<bool
   }
 };
 
-// Función para obtener URL firmada (para archivos privados)
+// Función para obtener URL de descarga (Firebase Storage no requiere URLs firmadas para archivos públicos)
 export const getSignedUrl = async (
   bucket: string,
-  filePath: string,
-  expiresIn: number = 3600 // 1 hora por defecto
+  filePath: string
 ): Promise<string | null> => {
   try {
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(filePath, expiresIn);
-
-    if (error) {
-      throw error;
-    }
-
-    return data.signedUrl;
+    const fileRef = ref(storage, `${bucket}/${filePath}`);
+    const downloadURL = await getDownloadURL(fileRef);
+    return downloadURL;
   } catch (error) {
-    console.error('Error al obtener URL firmada:', error);
+    console.error('Error al obtener URL de descarga:', error);
     return null;
   }
 };
@@ -230,18 +234,41 @@ export const listFiles = async (
   limit: number = 100
 ): Promise<{ name: string; id: string; updated_at: string; created_at: string; last_accessed_at: string; metadata: Record<string, unknown> }[]> => {
   try {
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .list(folder, {
-        limit,
-        sortBy: { column: 'created_at', order: 'desc' }
-      });
-
-    if (error) {
-      throw error;
-    }
-
-    return data || [];
+    const folderPath = folder ? `${bucket}/${folder}` : bucket;
+    const folderRef = ref(storage, folderPath);
+    const result = await listAll(folderRef);
+    
+    // Obtener metadatos para cada archivo
+    const filesWithMetadata = await Promise.all(
+      result.items.slice(0, limit).map(async (itemRef) => {
+        try {
+          const metadata = await getMetadata(itemRef);
+          return {
+            name: itemRef.name,
+            id: itemRef.fullPath,
+            updated_at: metadata.updated || new Date().toISOString(),
+            created_at: metadata.timeCreated || new Date().toISOString(),
+            last_accessed_at: metadata.updated || new Date().toISOString(),
+            metadata: metadata.customMetadata || {}
+          };
+        } catch (error) {
+          console.error('Error al obtener metadatos:', error);
+          return {
+            name: itemRef.name,
+            id: itemRef.fullPath,
+            updated_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            last_accessed_at: new Date().toISOString(),
+            metadata: {}
+          };
+        }
+      })
+    );
+    
+    // Ordenar por fecha de creación (más recientes primero)
+    return filesWithMetadata.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   } catch (error) {
     console.error('Error al listar archivos:', error);
     return [];
@@ -251,44 +278,31 @@ export const listFiles = async (
 // Función para obtener información de un archivo
 export const getFileInfo = async (bucket: string, filePath: string) => {
   try {
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .list('', {
-        search: filePath
-      });
-
-    if (error) {
-      throw error;
-    }
-
-    return data?.[0] || null;
+    const fileRef = ref(storage, `${bucket}/${filePath}`);
+    const metadata = await getMetadata(fileRef);
+    
+    return {
+      name: fileRef.name,
+      id: fileRef.fullPath,
+      updated_at: metadata.updated || new Date().toISOString(),
+      created_at: metadata.timeCreated || new Date().toISOString(),
+      last_accessed_at: metadata.updated || new Date().toISOString(),
+      metadata: metadata.customMetadata || {},
+      size: metadata.size,
+      contentType: metadata.contentType
+    };
   } catch (error) {
     console.error('Error al obtener información del archivo:', error);
     return null;
   }
 };
 
-// Función para crear buckets si no existen
+// Función para inicializar estructura de carpetas (Firebase Storage crea automáticamente las carpetas)
 export const createBucketsIfNotExist = async () => {
-  const buckets = ['avatars', 'events', 'sermons', 'blog', 'ministries', 'settings', 'documents'];
-  
-  for (const bucketName of buckets) {
-    try {
-      const { data: existingBuckets } = await supabase.storage.listBuckets();
-      const bucketExists = existingBuckets?.some(bucket => bucket.name === bucketName);
-      
-      if (!bucketExists) {
-        await supabase.storage.createBucket(bucketName, {
-          public: true,
-          allowedMimeTypes: ['image/*', 'video/*', 'audio/*', 'application/pdf'],
-          fileSizeLimit: 1024 * 1024 * 500 // 500MB
-        });
-        console.log(`Bucket '${bucketName}' creado exitosamente`);
-      }
-    } catch (error) {
-      console.error(`Error al crear bucket '${bucketName}':`, error);
-    }
-  }
+  // En Firebase Storage, las carpetas se crean automáticamente cuando se sube el primer archivo
+  // Esta función se mantiene para compatibilidad pero no es necesaria
+  console.log('Firebase Storage: Las carpetas se crean automáticamente al subir archivos');
+  return Promise.resolve();
 };
 
 // Hook para manejo de archivos con React
@@ -395,7 +409,7 @@ export const optimizeImage = async (
     format = 'jpeg'
   } = options;
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d')!;
     const img = new Image();
@@ -427,7 +441,13 @@ export const optimizeImage = async (
 
       // Convertir a blob con formato y calidad especificados
       const mimeType = format === 'webp' ? 'image/webp' : 'image/jpeg';
-      canvas.toBlob(resolve, mimeType, quality);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('Failed to create blob'));
+        }
+      }, mimeType, quality);
     };
 
     img.src = URL.createObjectURL(file);

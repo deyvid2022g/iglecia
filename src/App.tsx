@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { SupabaseAuthProvider } from './contexts/SupabaseAuthContext';
+import { FirebaseAuthProvider } from './contexts/FirebaseAuthContext';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -24,12 +24,13 @@ import { MujeresPage } from './pages/MujeresPage';
 import { SermonDetailPage } from './pages/PredicaDetailPage';
 import { EventDetailPage } from './pages/EventDetailPage';
 import { BlogPostPage } from './pages/BlogPostPage';
+import AdminPage from './pages/AdminPage';
 import { useScrollToTop } from './hooks/useScrollToTop';
 import './index.css';
 
 function App() {
   return (
-    <SupabaseAuthProvider>
+    <FirebaseAuthProvider>
       <Router>
         <ScrollToTop />
         <div className="min-h-screen bg-white text-black font-inter">
@@ -64,12 +65,20 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+              <Route 
+                path="/admin" 
+                element={
+                  <ProtectedRoute>
+                    <AdminPage />
+                  </ProtectedRoute>
+                } 
+              />
             </Routes>
           </main>
           <Footer />
         </div>
       </Router>
-    </SupabaseAuthProvider>
+    </FirebaseAuthProvider>
   );
 }
 

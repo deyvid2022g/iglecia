@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, User, LogOut, Settings } from 'lucide-react';
-import { useSupabaseAuth } from '../../contexts/SupabaseAuthContext';
+import { useFirebaseAuth } from '../../contexts/FirebaseAuthContext';
 import { AnimatedLogo } from '../AnimatedLogo';
 
 export function Header() {
@@ -9,7 +9,7 @@ export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
-  const { user, profile, signOut } = useSupabaseAuth();
+  const { user, profile, signOut } = useFirebaseAuth();
   
   const handleLogout = async () => {
     await signOut();
@@ -39,8 +39,9 @@ export function Header() {
   ];
 
   const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-    document.body.style.overflow = !isMenuOpen ? 'hidden' : '';
+    const newMenuState = !isMenuOpen;
+    setIsMenuOpen(newMenuState);
+    document.body.style.overflow = newMenuState ? 'hidden' : '';
   };
 
   return (
@@ -93,8 +94,8 @@ export function Header() {
                   className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 transition-colors focus-ring"
                 >
                   <img
-                    src={profile.avatar_url || user.user_metadata?.avatar_url || '/default-avatar.png'}
-                alt={user?.name || 'Usuario'}
+                    src={profile.avatar_url || user.photoURL || '/default-avatar.png'}
+                alt={user?.displayName || 'Usuario'}
                     className="w-8 h-8 rounded-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -102,13 +103,13 @@ export function Header() {
                       target.src = '/default-avatar.png';
                     }}
                   />
-                  <span className="hidden lg:block text-sm font-medium">{profile.full_name || user.user_metadata?.name || user.email}</span>
+                  <span className="hidden lg:block text-sm font-medium">{profile.name || user.displayName || user.email}</span>
                 </button>
                 
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-2 z-50">
                     <div className="px-4 py-2 border-b">
-                      <p className="text-sm font-medium text-gray-900">{profile.full_name || user.user_metadata?.name || user.email}</p>
+                      <p className="text-sm font-medium text-gray-900">{profile.name || user.displayName || user.email}</p>
               <p className="text-xs text-gray-500 capitalize">{profile.role}</p>
                     </div>
                     <Link
@@ -175,7 +176,7 @@ export function Header() {
       {/* Mobile Menu */}
       <div
         id="mobile-menu"
-        className={`md:hidden fixed inset-0 top-16 bg-white transform transition-transform duration-300 ease-in-out ${
+        className={`md:hidden fixed inset-0 top-16 bg-white transform transition-transform duration-300 ease-in-out z-50 ${
           isMenuOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -203,12 +204,12 @@ export function Header() {
               <>
                 <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 rounded-lg">
                   <img
-                    src={profile.avatar_url || user.user_metadata?.avatar_url || '/default-avatar.png'}
-                    alt={profile.full_name || user.user_metadata?.name || 'Usuario'}
+                    src={profile.avatar_url || user.photoURL || '/default-avatar.png'}
+                    alt={profile.name || user.displayName || 'Usuario'}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                   <div>
-                    <p className="font-medium">{profile.full_name || user.user_metadata?.name || user.email}</p>
+                    <p className="font-medium">{profile.name || user.displayName || user.email}</p>
                     <p className="text-sm text-gray-600 capitalize">{profile.role}</p>
                   </div>
                 </div>
@@ -254,10 +255,11 @@ export function Header() {
       {/* Overlay para cerrar menús al hacer click fuera */}
       {(isMenuOpen || showUserMenu) && (
         <div 
-          className="fixed inset-0 z-40" 
+          className="fixed inset-0 z-40 bg-black bg-opacity-50" 
           onClick={() => {
             setIsMenuOpen(false);
             setShowUserMenu(false);
+            document.body.style.overflow = '';
           }}
         />
       )}

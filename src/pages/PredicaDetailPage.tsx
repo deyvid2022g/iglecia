@@ -4,21 +4,30 @@ import {
   Play, 
   Pause, 
   Volume2, 
-  Download, 
+  VolumeX, 
+  Maximize, 
   Share2, 
-  FileText,
-  Clock,
-  Calendar,
-  User,
-  Maximize,
-  Heart,
-  MessageCircle
+  Heart, 
+  MessageCircle, 
+  Eye, 
+  Calendar, 
+  User, 
+  Tag, 
+  FileText, 
+  Download,
+  ArrowLeft,
+  ChevronRight,
+  Clock
 } from 'lucide-react';
+import { useSermon } from '../hooks/useSermons';
+import { getYouTubeEmbedUrl, isYouTubeUrl } from '../utils/videoUtils';
 
 export function SermonDetailPage() {
   // Renamed from SermonDetailPage but keeping the same function name for compatibility
-  const { slug: _ } = useParams();
+  const { slug } = useParams<{ slug: string }>();
+  const { sermon, loading, error } = useSermon(slug || '');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -29,91 +38,81 @@ export function SermonDetailPage() {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<{ id: number; author: string; text: string; date: string }[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [isYouTubeVideo, setIsYouTubeVideo] = useState(false);
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
-  // Simulated predica data - in real app this would come from an API
-  const sermon = {
-    id: '1',
-    title: 'Fe que transforma',
-    speaker: 'Pastor Reynel Dueñas',
-    sermon_date: '2025-01-06',
-    duration: '38:20',
-    description: 'En este mensaje profundizamos sobre cómo la fe activa puede transformar nuestras vidas, comunidades y el mundo que nos rodea. Exploramos ejemplos bíblicos y aplicaciones prácticas para vivir una fe que produce frutos tangibles.',
-    tags: ['fe', 'transformación', 'vida cristiana'],
-    video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    thumbnail_url: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=1200&h=675&fit=crop',
-    chapters: [
-      { time: 0, title: 'Introducción y bienvenida' },
-      { time: 300, title: 'Definiendo la fe transformadora' },
-      { time: 720, title: 'Ejemplos bíblicos de transformación' },
-      { time: 1200, title: 'Aplicación práctica en la vida diaria' },
-      { time: 1680, title: 'Oración y llamado al altar' }
-    ],
-    transcript: `[00:00] Bienvenidos hermanos a este día especial donde hablaremos sobre la fe que transforma.
-
-[02:15] La fe no es simplemente creer en algo, sino actuar basado en esa creencia. Cuando hablamos de fe transformadora, nos referimos a una fe que produce cambios visibles y tangibles.
-
-[05:30] En las Escrituras encontramos múltiples ejemplos de personas cuya fe produjo transformaciones extraordinarias. Abraham creyó y salió de su tierra. Moisés creyó y liberó a un pueblo. David creyó y venció al gigante.
-
-[12:00] ¿Pero cómo aplicamos esta fe transformadora en nuestro día a día? Primero, debemos entender que la fe requiere acción. Santiago nos dice que la fe sin obras está muerta.
-
-[20:00] Permíteme compartir contigo tres principios fundamentales de la fe transformadora: La fe ve lo invisible, la fe actúa en obediencia, y la fe persevera en las pruebas.
-
-[28:00] Quiero desafiarte hoy a que examines tu fe. ¿Está produciendo transformación en tu vida? ¿Está impactando a otros a tu alrededor?
-
-[35:00] Oremos juntos para que Dios nos ayude a vivir una fe que realmente transforma...`,
-    resources: [
-      { title: 'Notas del sermón (PDF)', url: '/resources/fe-que-transforma-notes.pdf' },
-      { title: 'Guía de estudio grupal', url: '/resources/fe-que-transforma-study.pdf' },
-      { title: 'Versículos clave', url: '/resources/fe-que-transforma-verses.pdf' }
-    ]
+  // Format date helper
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
 
-  // Simulated related predicas
-  const relatedSermons = [
-    {
-      id: '2',
-      slug: 'amor-y-servicio',
-      title: 'Amor y servicio',
-      speaker: 'Pastor Reynel Dueñas',
-      sermon_date: '2025-01-13',
-      thumbnail_url: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=400&h=225&fit=crop'
-    },
-    {
-      id: '3',
-      slug: 'esperanza-en-tiempos-dificiles',
-      title: 'Esperanza en tiempos difíciles',
-      speaker: 'Pastor Reynel Dueñas',
-      sermon_date: '2025-01-20',
-      thumbnail_url: 'https://images.pexels.com/photos/289586/pexels-photo-289586.jpeg?auto=compress&cs=tinysrgb&w=400&h=225&fit=crop'
+
+
+  useEffect(() => {
+    if (sermon?.video_url) {
+      const isYT = isYouTubeUrl(sermon.video_url);
+      setIsYouTubeVideo(isYT);
+      
+      if (isYT) {
+        const embedUrl = getYouTubeEmbedUrl(sermon.video_url);
+        setEmbedUrl(embedUrl);
+      } else {
+        setEmbedUrl(null);
+      }
     }
-  ];
+  }, [sermon?.video_url]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isYouTubeVideo) return;
 
-    const updateTime = () => setCurrentTime(video.currentTime);
-    const updateDuration = () => setDuration(video.duration);
+    const updateTime = () => {
+      if (video && !video.paused) {
+        setCurrentTime(video.currentTime);
+      }
+    };
+    const updateDuration = () => {
+      if (video && video.duration) {
+        setDuration(video.duration);
+      }
+    };
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
 
     video.addEventListener('timeupdate', updateTime);
     video.addEventListener('loadedmetadata', updateDuration);
-    video.addEventListener('play', () => setIsPlaying(true));
-    video.addEventListener('pause', () => setIsPlaying(false));
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
 
     return () => {
-      video.removeEventListener('timeupdate', updateTime);
-      video.removeEventListener('loadedmetadata', updateDuration);
-      video.removeEventListener('play', () => setIsPlaying(true));
-      video.removeEventListener('pause', () => setIsPlaying(false));
+      if (video) {
+        video.removeEventListener('timeupdate', updateTime);
+        video.removeEventListener('loadedmetadata', updateDuration);
+        video.removeEventListener('play', handlePlay);
+        video.removeEventListener('pause', handlePause);
+      }
     };
-  }, []);
+  }, [isYouTubeVideo, sermon?.video_url]);
 
-  const togglePlayPause = () => {
-    if (videoRef.current) {
+  const togglePlayPause = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    try {
       if (isPlaying) {
-        videoRef.current.pause();
+        video.pause();
       } else {
-        videoRef.current.play();
+        await video.play();
+      }
+    } catch (error) {
+      // Silently handle AbortError and other play interruptions
+      if (error.name !== 'AbortError') {
+        console.warn('Error during video playback:', error);
       }
     }
   };
@@ -137,13 +136,7 @@ export function SermonDetailPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+
 
   const jumpToTranscriptTime = (text: string) => {
     const timeMatch = text.match(/\[(\d{2}):(\d{2})\]/);
@@ -157,15 +150,17 @@ export function SermonDetailPage() {
   
   // Function to share the sermon
   const shareSermon = async () => {
+    if (!sermon) return;
     try {
+      const text = `¡Escucha esta increíble prédica: "${sermon.title}" por ${sermon.speaker_name || 'Predicador'}!`;
       if (navigator.share) {
         await navigator.share({
           title: sermon.title,
-          text: `${sermon.title} - ${sermon.speaker}`,
+          text: text,
           url: window.location.href
         });
       } else {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(`${text} ${window.location.href}`);
         alert('Enlace copiado al portapapeles');
       }
     } catch (_) {
@@ -176,9 +171,9 @@ export function SermonDetailPage() {
   // Initialize comments with dummy data
   useEffect(() => {
     setComments([
-      { id: 1, author: 'Carlos Mendoza', content: 'Esta prédica cambió mi perspectiva sobre la fe. Gracias Pastor Reynel.', date: '2023-05-15T14:30:00' },
-      { id: 2, author: 'Laura Sánchez', content: 'Justo lo que necesitaba escuchar hoy. Dios habló a mi corazón.', date: '2023-05-16T09:20:00' },
-      { id: 3, author: 'Roberto Gómez', content: '¡Excelente mensaje! Lo compartiré con mi grupo familiar.', date: '2023-05-16T16:45:00' },
+      { id: 1, author: 'Carlos Mendoza', text: 'Esta prédica cambió mi perspectiva sobre la fe. Gracias Pastor Reynel.', date: '2023-05-15T14:30:00' },
+      { id: 2, author: 'Laura Sánchez', text: 'Justo lo que necesitaba escuchar hoy. Dios habló a mi corazón.', date: '2023-05-16T09:20:00' },
+      { id: 3, author: 'Roberto Gómez', text: '¡Excelente mensaje! Lo compartiré con mi grupo familiar.', date: '2023-05-16T16:45:00' },
     ]);
   }, []);
   
@@ -190,7 +185,7 @@ export function SermonDetailPage() {
     const newCommentObj = {
       id: comments.length + 1,
       author: 'Usuario',
-      content: newComment,
+      text: newComment,
       date: new Date().toISOString()
     };
     
@@ -198,11 +193,23 @@ export function SermonDetailPage() {
     setNewComment('');
   };
 
-  if (!sermon) {
+  if (loading) {
     return (
       <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Predica no encontrada</h1>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando prédica...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !sermon) {
+    return (
+      <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Prédica no encontrada</h1>
+          <p className="text-gray-600 mb-4">{error || 'La prédica que buscas no existe.'}</p>
           <Link to="/predicas" className="btn-primary">
             Ver todas las prédicas
           </Link>
@@ -248,68 +255,84 @@ export function SermonDetailPage() {
               {/* Video Player */}
               <div className="bg-black rounded-lg overflow-hidden mb-6">
                 <div className="relative aspect-video">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full"
-                    poster={sermon.thumbnail_url}
-                    preload="metadata"
-                  >
-                    <source src={sermon.video_url} type="video/mp4" />
-                    <track kind="captions" src="/captions/fe-que-transforma.vtt" srcLang="es" label="Español" />
-                    Tu navegador no soporta video HTML5.
-                  </video>
-
-                  {/* Custom Controls */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                    <div className="flex items-center space-x-4">
-                      <button
-                        onClick={togglePlayPause}
-                        className="text-white hover:text-gray-300 transition-colors focus-ring-white"
-                        aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
+                  {isYouTubeVideo && embedUrl ? (
+                    // YouTube iframe player
+                    <iframe
+                      ref={iframeRef}
+                      className="w-full h-full"
+                      src={embedUrl}
+                      title={sermon.title}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  ) : (
+                    // HTML5 video player for non-YouTube videos
+                    <>
+                      <video
+                        ref={videoRef}
+                        className="w-full h-full"
+                        poster={sermon.thumbnail_url}
+                        preload="metadata"
                       >
-                        {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                      </button>
+                        <source src={sermon.video_url} type="video/mp4" />
+                        <track kind="captions" src="/captions/fe-que-transforma.vtt" srcLang="es" label="Español" />
+                        Tu navegador no soporta video HTML5.
+                      </video>
 
-                      <div className="flex items-center space-x-2 text-white text-sm">
-                        <span>{formatTime(currentTime)}</span>
-                        <span>/</span>
-                        <span>{formatTime(duration)}</span>
+                      {/* Custom Controls - Only for non-YouTube videos */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                        <div className="flex items-center space-x-4">
+                          <button
+                            onClick={togglePlayPause}
+                            className="text-white hover:text-gray-300 transition-colors focus-ring-white"
+                            aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
+                          >
+                            {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                          </button>
+
+                          <div className="flex items-center space-x-2 text-white text-sm">
+                            <span>{formatTime(currentTime)}</span>
+                            <span>/</span>
+                            <span>{formatTime(duration)}</span>
+                          </div>
+
+                          <div className="flex-1">
+                            <input
+                              type="range"
+                              min={0}
+                              max={duration}
+                              value={currentTime}
+                              onChange={(e) => seekTo(parseFloat(e.target.value))}
+                              className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Volume2 className="w-5 h-5 text-white" />
+                            <input
+                              type="range"
+                              min={0}
+                              max={1}
+                              step={0.1}
+                              value={volume}
+                              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                              className="w-16 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                              aria-label="Control de volumen"
+                            />
+                          </div>
+
+                          <button
+                            className="text-white hover:text-gray-300 transition-colors focus-ring-white"
+                            aria-label="Pantalla completa"
+                            onClick={() => videoRef.current?.requestFullscreen()}
+                          >
+                            <Maximize className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
-
-                      <div className="flex-1">
-                        <input
-                          type="range"
-                          min={0}
-                          max={duration}
-                          value={currentTime}
-                          onChange={(e) => seekTo(parseFloat(e.target.value))}
-                          className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                        />
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Volume2 className="w-5 h-5 text-white" />
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.1}
-                          value={volume}
-                          onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                          className="w-16 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                          aria-label="Control de volumen"
-                        />
-                      </div>
-
-                      <button
-                        className="text-white hover:text-gray-300 transition-colors focus-ring-white"
-                        aria-label="Pantalla completa"
-                        onClick={() => videoRef.current?.requestFullscreen()}
-                      >
-                        <Maximize className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -320,11 +343,11 @@ export function SermonDetailPage() {
                 <div className="flex flex-wrap items-center gap-6 text-gray-600 mb-6">
                   <div className="flex items-center">
                     <User className="w-5 h-5 mr-2" />
-                    <span className="font-medium">{sermon.speaker}</span>
+                    <span className="font-medium">{sermon.speaker_name}</span>
                   </div>
                   <div className="flex items-center">
                     <Calendar className="w-5 h-5 mr-2" />
-                    <span>{formatDate(sermon.sermon_date)}</span>
+                    <span>{formatDate(sermon.preached_date)}</span>
                   </div>
                   <div className="flex items-center">
                     <Clock className="w-5 h-5 mr-2" />
@@ -337,7 +360,7 @@ export function SermonDetailPage() {
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-6">
-                  {sermon.tags.map((tag) => (
+                  {sermon.tags?.map((tag) => (
                     <span
                       key={tag}
                       className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium"
@@ -371,7 +394,7 @@ export function SermonDetailPage() {
               </div>
 
               {/* Transcript */}
-              {showTranscript && (
+              {showTranscript && sermon.transcript && (
                 <div className="bg-gray-50 rounded-lg p-6 mb-8">
                   <h3 className="text-xl font-semibold mb-4">Transcripción</h3>
                   <div className="prose prose-gray max-w-none">
@@ -392,75 +415,37 @@ export function SermonDetailPage() {
                   </p>
                 </div>
               )}
-
-              {/* Resources */}
-              {sermon.resources.length > 0 && (
-                <div className="bg-white border rounded-lg p-6 mb-8">
-                  <h3 className="text-xl font-semibold mb-4">Recursos adicionales</h3>
-                  <div className="space-y-3">
-                    {sermon.resources.map((resource, index) => (
-                      <a
-                        key={index}
-                        href={resource.url}
-                        className="flex items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors focus-ring"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <FileText className="w-5 h-5 text-gray-600 mr-3" />
-                        <span className="font-medium">{resource.title}</span>
-                        <Download className="w-4 h-4 text-gray-400 ml-auto" />
-                      </a>
-                    ))}
-                  </div>
+              
+              {showTranscript && !sermon.transcript && (
+                <div className="bg-gray-50 rounded-lg p-6 mb-8">
+                  <h3 className="text-xl font-semibold mb-4">Transcripción</h3>
+                  <p className="text-gray-600">La transcripción no está disponible para esta prédica.</p>
                 </div>
               )}
+
+              {/* Resources - Commented out as resources are not part of Sermon type */}
+              {/* Future implementation: Resources will be fetched from sermon_resources table */}
             </div>
 
             {/* Sidebar */}
             <div className="xl:col-span-1">
-              {/* Chapters */}
-              <div className="bg-white border rounded-lg p-6 mb-6">
-                <h3 className="text-lg font-semibold mb-4">Capítulos</h3>
-                <div className="space-y-2">
-                  {sermon.chapters.map((chapter, index) => (
-                    <button
-                      key={index}
-                      onClick={() => seekTo(chapter.time)}
-                      className="w-full text-left p-3 rounded-lg hover:bg-gray-50 transition-colors focus-ring text-sm"
-                    >
-                      <div className="font-medium mb-1">{chapter.title}</div>
-                      <div className="text-gray-600">{formatTime(chapter.time)}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Chapters - Commented out as chapters are not part of Sermon type */}
+              {/* Future implementation: Chapters will be fetched from a separate table if needed */}
 
               {/* Related Sermons */}
-              <div className="bg-white border rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-4">Prédicas relacionadas</h3>
-                <div className="space-y-4">
-                  {relatedSermons.map((relatedSermon) => (
-                    <Link
-                      key={relatedSermon.id}
-                      to={`/predicas/${relatedSermon.slug}`}
-                      className="block group focus-ring rounded-lg"
-                    >
-                      <div className="aspect-video rounded-lg overflow-hidden mb-2">
-                        <img
-                          src={relatedSermon.thumbnail_url}
-                          alt={relatedSermon.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <h4 className="font-medium text-sm mb-1 group-hover:text-gray-700 transition-colors">
-                        {relatedSermon.title}
-                      </h4>
-                      <p className="text-xs text-gray-600 mb-1">{relatedSermon.speaker}</p>
-                      <p className="text-xs text-gray-500">{formatDate(relatedSermon.sermon_date)}</p>
-                    </Link>
-                  ))}
+              {sermon.sermon_categories && (
+                <div className="bg-white border rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4">Prédicas relacionadas</h3>
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Categoría: {sermon.sermon_categories.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Próximamente mostraremos más prédicas de esta categoría.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
           
@@ -507,7 +492,7 @@ export function SermonDetailPage() {
                         <div className="font-medium">{comment.author}</div>
                         <div className="text-sm text-gray-500">{new Date(comment.date).toLocaleDateString()}</div>
                       </div>
-                      <p className="text-gray-700">{comment.content}</p>
+                      <p className="text-gray-700">{comment.text}</p>
                     </div>
                   ))}
                 </div>

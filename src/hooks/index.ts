@@ -4,6 +4,11 @@ export {
   usePermissions
 } from './useAuth';
 
+// Hooks de administración
+export {
+  useAdmin
+} from './useAdmin';
+
 // Hooks de eventos
 export {
   useEvents,

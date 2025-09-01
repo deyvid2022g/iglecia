@@ -64,8 +64,8 @@ export class NetworkError extends AppError {
   }
 }
 
-// Función para manejar errores de Supabase
-export function handleSupabaseError(error: unknown, context?: Record<string, unknown>): AppError {
+// Función para manejar errores de Firebase
+export function handleFirebaseError(error: unknown, context?: Record<string, unknown>): AppError {
   if (!error) {
     return new AppError('Error desconocido', 500, true, context);
   }
@@ -105,7 +105,15 @@ export function handleSupabaseError(error: unknown, context?: Record<string, unk
 
 // Función para logging de errores
 export function logError(error: Error, context?: Record<string, unknown>) {
-  const errorInfo = {
+  const errorInfo: {
+    name: string;
+    message: string;
+    stack: string | undefined;
+    timestamp: string;
+    context: Record<string, unknown> | undefined;
+    statusCode?: number;
+    isOperational?: boolean;
+  } = {
     name: error.name,
     message: error.message,
     stack: error.stack,

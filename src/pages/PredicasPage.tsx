@@ -20,9 +20,9 @@ export function PredicasPage() {
   const filteredSermons = sermons.filter(sermon => {
     const matchesSearch = sermon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          sermon.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sermon.speaker?.toLowerCase().includes(searchTerm.toLowerCase());
+                         sermon.speaker_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTag = !selectedTag || (sermon.tags?.includes(selectedTag) ?? false);
-    const matchesSpeaker = !selectedSpeaker || sermon.speaker === selectedSpeaker;
+    const matchesSpeaker = !selectedSpeaker || sermon.speaker_name === selectedSpeaker;
     
     return matchesSearch && matchesTag && matchesSpeaker;
   });
@@ -201,9 +201,9 @@ export function PredicasPage() {
                         </Link>
                       </h2>
                       <div className="flex items-center text-gray-600 text-sm space-x-4 mb-3">
-                        <span>{sermon.speaker}</span>
+                        <span>{sermon.speaker_name}</span>
                         <span>•</span>
-                        <span>{formatDate(sermon.sermon_date)}</span>
+                        <span>{formatDate(sermon.preached_date)}</span>
                         <span>•</span>
                         <span>{sermon.view_count?.toLocaleString() || 0} visualizaciones</span>
                       </div>
@@ -261,7 +261,7 @@ export function PredicasPage() {
                         <button
                           onClick={() => shareSermon({ 
                             title: sermon.title,
-                            speaker_name: sermon.speaker || '',
+                            speaker_name: sermon.speaker_name || '',
                             slug: sermon.slug
                           })}
                           className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors focus-ring"

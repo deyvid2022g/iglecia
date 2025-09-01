@@ -1,12 +1,37 @@
 import { useState, useEffect } from 'react'
-import { User, Session } from '@supabase/supabase-js'
-import { supabase, getCurrentProfile, createProfile, type Profile } from '../lib/supabase'
-import { handleSupabaseError, logError, AppError } from '../lib/errors'
+import { 
+  User, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  sendPasswordResetEmail, 
+  onAuthStateChanged,
+  updateProfile as firebaseUpdateProfile
+} from 'firebase/auth'
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  serverTimestamp 
+} from 'firebase/firestore'
+import { auth, db } from '../lib/firebase'
+import { logError, AppError } from '../lib/errors'
+
+export interface Profile {
+  id: string
+  email: string
+  full_name: string
+  phone?: string
+  role: 'admin' | 'pastor' | 'editor' | 'leader' | 'member'
+  created_at: string
+  updated_at: string
+  last_login?: string
+}
 
 export interface AuthState {
   user: User | null
   profile: Profile | null
-  session: Session | null
   loading: boolean
   error: string | null
 }
@@ -22,121 +47,135 @@ export interface AuthActions {
 export const useAuth = (): AuthState & AuthActions => {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Helper function to get user profile from Firestore
+  const getUserProfile = async (userId: string): Promise<Profile | null> => {
+    try {
+      const profileDoc = await getDoc(doc(db, 'profiles', userId))
+      if (profileDoc.exists()) {
+        return profileDoc.data() as Profile
+      }
+      return null
+    } catch (error) {
+      console.error('Error getting user profile:', error)
+      return null
+    }
+  }
+
+  // Helper function to create user profile in Firestore
+  const createUserProfile = async (user: User, userData: { full_name: string; phone?: string }): Promise<Profile> => {
+    const profile: Profile = {
+      id: user.uid,
+      email: user.email!,
+      full_name: userData.full_name,
+      phone: userData.phone,
+      role: 'member',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    
+    await setDoc(doc(db, 'profiles', user.uid), profile)
+    return profile
+  }
+
   useEffect(() => {
-    // Obtener sesión inicial
-    const getInitialSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          const appError = handleSupabaseError(error, { action: 'getSession' })
-          logError(appError)
-          setError(appError.message)
-        } else {
-          setSession(session)
-          setUser(session?.user ?? null)
-          
-          if (session?.user) {
-            const profile = await getCurrentProfile()
-            setProfile(profile)
-          }
-        }
-      } catch (err) {
-        const appError = new AppError('Error al obtener la sesión', 500, true, { action: 'getInitialSession' })
-        logError(appError, { originalError: err })
-        setError(appError.message)
-      } finally {
-        setLoading(false)
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser?.email)
+      
+      setUser(firebaseUser)
+      
+      if (firebaseUser) {
+        // Obtener perfil del usuario
+        const userProfile = await getUserProfile(firebaseUser.uid)
+        setProfile(userProfile)
+      } else {
+        setProfile(null)
       }
-    }
+      
+      setLoading(false)
+    })
 
-    getInitialSession()
-
-    // Escuchar cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session)
-        
-        setSession(session)
-        setUser(session?.user ?? null)
-        setError(null)
-        
-        if (session?.user) {
-          const profile = await getCurrentProfile()
-          setProfile(profile)
-        } else {
-          setProfile(null)
-        }
-        
-        setLoading(false)
-      }
-    )
-
-    return () => {
-      subscription.unsubscribe()
-    }
+    return () => unsubscribe()
   }, [])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<{ error: AppError | null }> => {
     try {
       setLoading(true)
       setError(null)
       
-      try {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        })
-        
-        if (error) {
-          const appError = handleSupabaseError(error, { action: 'signIn', email })
-          logError(appError)
-          setError(appError.message)
-          return { error: appError }
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
+
+      if (user) {
+        // Actualizar last_login en el perfil
+        try {
+          await updateDoc(doc(db, 'profiles', user.uid), {
+            last_login: serverTimestamp()
+          })
+        } catch (updateError) {
+          console.warn('Error updating last_login:', updateError)
+          // No fallar el login por este error
         }
-        
-        return { error: null }
-      } catch (supabaseError) {
-        // Fallback: verificar si hay usuario mock guardado
-        console.warn('Supabase no disponible, verificando usuario mock:', supabaseError)
-        
-        const mockUser = localStorage.getItem('mock_user')
-        if (mockUser) {
-          const user = JSON.parse(mockUser)
-          if (user.email === email) {
-            setUser(user)
-            return { error: null }
-          }
-        }
-        
-        // Si no hay usuario mock, crear uno nuevo
-        const newMockUser = {
-          id: `mock-${Date.now()}`,
-          email,
-          user_metadata: {
-            full_name: email.split('@')[0],
-            phone: ''
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        
-        localStorage.setItem('mock_user', JSON.stringify(newMockUser))
-        localStorage.setItem('mock_session', JSON.stringify({
-          access_token: `mock-token-${Date.now()}`,
-          user: newMockUser
-        }))
-        
-        setUser(newMockUser as any)
-        return { error: null }
       }
-    } catch (err) {
-      const appError = new AuthenticationError('Error al iniciar sesión', { action: 'signIn', email, originalError: err })
-      logError(appError)
+
+      return { error: null }
+    } catch (err: any) {
+      const appError = new AppError(
+        err.code === 'auth/user-not-found' ? 'Usuario no encontrado' :
+        err.code === 'auth/wrong-password' ? 'Contraseña incorrecta' :
+        err.code === 'auth/invalid-email' ? 'Email inválido' :
+        err.code === 'auth/user-disabled' ? 'Usuario deshabilitado' :
+        'Error al iniciar sesión',
+        400,
+        true,
+        { action: 'signIn', email, firebaseCode: err.code }
+      )
+      logError(appError, { originalError: err })
+      setError(appError.message)
+      
+      return { error: appError }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const signUp = async (email: string, password: string, userData: { full_name: string; phone?: string }): Promise<{ error: AppError | null }> => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
+
+      if (user) {
+        // Actualizar el perfil de Firebase Auth
+        await firebaseUpdateProfile(user, {
+          displayName: userData.full_name
+        })
+
+        // Crear perfil en Firestore
+        try {
+          await createUserProfile(user, userData)
+        } catch (profileError) {
+          console.warn('Error creating profile:', profileError)
+          // No fallar el registro por este error
+        }
+      }
+
+      return { error: null }
+    } catch (err: any) {
+      const appError = new AppError(
+        err.code === 'auth/email-already-in-use' ? 'El email ya está en uso' :
+        err.code === 'auth/weak-password' ? 'La contraseña es muy débil' :
+        err.code === 'auth/invalid-email' ? 'Email inválido' :
+        'Error al registrarse',
+        400,
+        true,
+        { action: 'signUp', email, firebaseCode: err.code }
+      )
+      logError(appError, { originalError: err })
       setError(appError.message)
       return { error: appError }
     } finally {
@@ -144,70 +183,26 @@ export const useAuth = (): AuthState & AuthActions => {
     }
   }
 
-  const signUp = async (email: string, password: string, userData: { full_name: string; phone?: string }) => {
+  const signOut = async (): Promise<{ error: AppError | null }> => {
     try {
       setLoading(true)
       setError(null)
       
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: userData.full_name,
-              phone: userData.phone
-            }
-          }
-        })
-        
-        if (error) {
-          const appError = handleSupabaseError(error, { action: 'signUp', email })
-          logError(appError)
-          throw appError
-        }
-        
-        if (data.user) {
-          setUser(data.user)
-        }
-        
-        return data
-      } catch (supabaseError) {
-        // Fallback: simular registro exitoso cuando Supabase no está disponible
-        console.warn('Supabase no disponible, usando fallback para registro:', supabaseError)
-        
-        // Simular usuario registrado
-        const mockUser = {
-          id: `mock-${Date.now()}`,
-          email,
-          user_metadata: {
-            full_name: userData.full_name,
-            phone: userData.phone
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        
-        // Guardar en localStorage para persistencia
-        localStorage.setItem('mock_user', JSON.stringify(mockUser))
-        localStorage.setItem('mock_session', JSON.stringify({
-          access_token: `mock-token-${Date.now()}`,
-          user: mockUser
-        }))
-        
-        setUser(mockUser as any)
-        
-        return {
-          user: mockUser,
-          session: {
-            access_token: `mock-token-${Date.now()}`,
-            user: mockUser
-          }
-        }
-      }
-    } catch (err) {
-      const appError = new AppError('Error al registrar usuario', 500, true, { action: 'signUp', email, originalError: err })
-      logError(appError)
+      await firebaseSignOut(auth)
+      
+      // Limpiar estado local
+      setUser(null)
+      setProfile(null)
+      
+      return { error: null }
+    } catch (err: any) {
+      const appError = new AppError(
+        'Error al cerrar sesión',
+        500,
+        true,
+        { action: 'signOut', firebaseCode: err.code }
+      )
+      logError(appError, { originalError: err })
       setError(appError.message)
       return { error: appError }
     } finally {
@@ -215,97 +210,75 @@ export const useAuth = (): AuthState & AuthActions => {
     }
   }
 
-  const signOut = async () => {
+  const resetPassword = async (email: string): Promise<{ error: AppError | null }> => {
     try {
       setLoading(true)
       setError(null)
       
-      const { error } = await supabase.auth.signOut()
+      await sendPasswordResetEmail(auth, email)
       
-      if (error) {
-        const appError = handleSupabaseError(error, { action: 'signOut' })
-        logError(appError)
+      return { error: null }
+    } catch (err: any) {
+      const appError = new AppError(
+        err.code === 'auth/user-not-found' ? 'Usuario no encontrado' :
+        err.code === 'auth/invalid-email' ? 'Email inválido' :
+        'Error al enviar email de recuperación',
+        400,
+        true,
+        { action: 'resetPassword', email, firebaseCode: err.code }
+      )
+      logError(appError, { originalError: err })
+      setError(appError.message)
+      return { error: appError }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updateProfile = async (updates: Partial<Profile>): Promise<{ error: AppError | null }> => {
+    try {
+      if (!user) {
+        const appError = new AppError('Usuario no autenticado', 401, false, { action: 'updateProfile' })
         setError(appError.message)
         return { error: appError }
       }
       
-      return { error: null }
-    } catch (err) {
-      const appError = new AppError('Error al cerrar sesión', 500, true, { action: 'signOut', originalError: err })
-      logError(appError)
-      setError(appError.message)
-      return { error: appError }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const resetPassword = async (email: string) => {
-    try {
+      setLoading(true)
       setError(null)
       
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
+      await updateDoc(doc(db, 'profiles', user.uid), {
+        ...updates,
+        updated_at: new Date().toISOString()
       })
       
-      if (error) {
-        const appError = handleSupabaseError(error, { action: 'resetPassword', email })
-        logError(appError)
-        setError(appError.message)
-        return { error: appError }
+      // Actualizar estado local
+      if (profile) {
+        setProfile({
+          ...profile,
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
       }
       
       return { error: null }
-    } catch (err) {
-      const appError = new AppError('Error al enviar email de recuperación', 500, true, { action: 'resetPassword', email, originalError: err })
-      logError(appError)
+    } catch (err: any) {
+      const appError = new AppError(
+        'Error al actualizar perfil',
+        500,
+        true,
+        { action: 'updateProfile', userId: user?.uid, firebaseCode: err.code }
+      )
+      logError(appError, { originalError: err })
       setError(appError.message)
       return { error: appError }
-    }
-  }
-
-  const updateProfile = async (updates: Partial<Profile>) => {
-    try {
-      setError(null)
-      
-      if (!user) {
-        const appError = new AuthenticationError('Usuario no autenticado', { action: 'updateProfile' })
-        logError(appError)
-        setError(appError.message)
-        return { error: appError }
-      }
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id)
-        .select()
-        .single()
-      
-      if (error) {
-        const appError = handleSupabaseError(error, { action: 'updateProfile', userId: user.id })
-        logError(appError)
-        setError(appError.message)
-        return { error: appError }
-      }
-      
-      if (data) {
-        setProfile(data)
-      }
-      
-      return { error: null }
-    } catch (err) {
-      const appError = new AppError('Error al actualizar perfil', 500, true, { action: 'updateProfile', userId: user?.id, originalError: err })
-      logError(appError)
-      setError(appError.message)
-      return { error: appError }
+    } finally {
+      setLoading(false)
     }
   }
 
   return {
     user,
     profile,
-    session,
     loading,
     error,
     signIn,
@@ -316,46 +289,23 @@ export const useAuth = (): AuthState & AuthActions => {
   }
 }
 
-// Hook para verificar si el usuario tiene un rol específico
-export const useRole = (requiredRole?: string | string[]) => {
-  const { profile, loading } = useAuth()
-  
-  const hasRole = () => {
-    if (!profile || !requiredRole) return true
-    
-    if (Array.isArray(requiredRole)) {
-      return requiredRole.includes(profile.role)
-    }
-    
-    return profile.role === requiredRole
-  }
-  
-  return {
-    hasRole: hasRole(),
-    role: profile?.role,
-    loading
-  }
+// Hook para obtener el rol del usuario actual
+export const useRole = () => {
+  const { profile } = useAuth()
+  return profile?.role || 'member'
 }
 
-// Hook para verificar permisos específicos
+// Hook para verificar permisos
 export const usePermissions = () => {
-  const { profile } = useAuth()
+  const role = useRole()
   
-  const canManageEvents = profile?.role === 'admin' || profile?.role === 'pastor' || profile?.role === 'leader'
-  const canManageSermons = profile?.role === 'admin' || profile?.role === 'pastor'
-const canManageBlog = ['admin', 'pastor', 'editor'].includes(profile?.role ?? '')
-  const canManageUsers = profile?.role === 'admin' || profile?.role === 'pastor'
-  const canManageSettings = profile?.role === 'admin'
-  
-  return {
-    canManageEvents,
-    canManageSermons,
-    canManageBlog,
-    canManageUsers,
-    canManageSettings,
-    isAdmin: profile?.role === 'admin',
-    isPastor: profile?.role === 'pastor',
-    isEditor: profile?.role === 'editor' as string,
-    isMember: profile?.role === 'member'
+  const permissions = {
+    canManageUsers: ['admin'].includes(role),
+    canManageContent: ['admin', 'pastor', 'editor'].includes(role),
+    canViewReports: ['admin', 'pastor'].includes(role),
+    canManageEvents: ['admin', 'pastor', 'editor', 'leader'].includes(role),
+    canViewMembers: ['admin', 'pastor', 'leader'].includes(role)
   }
+  
+  return permissions
 }

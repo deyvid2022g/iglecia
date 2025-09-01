@@ -1,46 +1,48 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-// TODO: Generate database types using Supabase CLI
-// For now using a placeholder type definition
-type Database = {
-  public: {
-    Tables: {
-      contact_messages: {
-        Row: {
-          id: string;
-          created_at: string;
-          updated_at: string;
-          name: string;
-          email: string;
-          phone?: string;
-          subject: string;
-          message: string;
-          status: string;
-          source?: string;
-          metadata?: Record<string, unknown>;
-          responded_by?: string;
-          responded_at?: string;
-          response?: string;
-        }
-      },
-      newsletter_subscriptions: {
-        Row: {
-          id: string;
-          created_at: string;
-          email: string;
-          name?: string;
-          preferences?: Record<string, unknown>;
-          is_active: boolean;
-          subscribed_at: string;
-          unsubscribed_at?: string;
-        }
-      }
-    }
-  }
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  serverTimestamp,
+  FieldValue
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
+// Firebase type definitions
+export interface ContactMessage {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  status: string;
+  source?: string;
+  metadata?: Record<string, unknown>;
+  responded_by?: string;
+  responded_at?: string;
+  response?: string;
 }
 
-type ContactMessage = Database['public']['Tables']['contact_messages']['Row'];
-type NewsletterSubscription = Database['public']['Tables']['newsletter_subscriptions']['Row'];
+export interface NewsletterSubscription {
+  id: string;
+  created_at: string;
+  email: string;
+  name?: string;
+  preferences?: Record<string, unknown>;
+  is_active: boolean;
+  subscribed_at: string;
+  unsubscribed_at?: string;
+}
 
 // Hook para gestionar mensajes de contacto
 export function useContactMessages() {
@@ -51,13 +53,23 @@ export function useContactMessages() {
   const fetchMessages = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('contact_messages')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setMessages(data || []);
+      const messagesRef = collection(db, 'contact_messages');
+      const q = query(messagesRef, orderBy('created_at', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      const messagesData: ContactMessage[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        messagesData.push({
+          id: doc.id,
+          ...data,
+          created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+          responded_at: data.responded_at?.toDate?.()?.toISOString() || data.responded_at
+        } as ContactMessage);
+      });
+      
+      setMessages(messagesData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar mensajes');
     } finally {
@@ -67,15 +79,29 @@ export function useContactMessages() {
 
   const createMessage = async (message: Omit<ContactMessage, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const { data, error } = await supabase
-        .from('contact_messages')
-        .insert([message])
-        .select()
-        .single();
-
-      if (error) throw error;
-      await fetchMessages();
-      return data;
+      const messagesRef = collection(db, 'contact_messages');
+      const newMessage = {
+        ...message,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      };
+      
+      const docRef = await addDoc(messagesRef, newMessage);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const createdMessage = {
+          id: docSnap.id,
+          ...data,
+          created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at
+        } as ContactMessage;
+        
+        await fetchMessages();
+        return createdMessage;
+      }
+      throw new Error('Error al crear el mensaje');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al enviar mensaje');
       throw err;
@@ -84,19 +110,19 @@ export function useContactMessages() {
 
   const updateMessageStatus = async (id: string, status: string, respondedBy?: string, response?: string) => {
     try {
-      const updates: Record<string, unknown> = { status };
+      const messageRef = doc(db, 'contact_messages', id);
+      const updates: { [x: string]: FieldValue | Partial<unknown> | undefined } = { 
+        status,
+        updated_at: serverTimestamp()
+      };
+      
       if (status === 'responded' && respondedBy && response) {
         updates.responded_by = respondedBy;
-        updates.responded_at = new Date().toISOString();
+        updates.responded_at = serverTimestamp();
         updates.response = response;
       }
 
-      const { error } = await supabase
-        .from('contact_messages')
-        .update(updates)
-        .eq('id', id);
-
-      if (error) throw error;
+      await updateDoc(messageRef, updates);
       await fetchMessages();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al actualizar mensaje');
@@ -105,12 +131,8 @@ export function useContactMessages() {
 
   const deleteMessage = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('contact_messages')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      const messageRef = doc(db, 'contact_messages', id);
+      await deleteDoc(messageRef);
       await fetchMessages();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al eliminar mensaje');
@@ -164,13 +186,23 @@ export function useNewsletterSubscriptions() {
   const fetchSubscriptions = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('newsletter_subscriptions')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSubscriptions(data || []);
+      const subscriptionsRef = collection(db, 'newsletter_subscriptions');
+      const q = query(subscriptionsRef, orderBy('created_at', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      const subscriptionsData: NewsletterSubscription[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        subscriptionsData.push({
+          id: doc.id,
+          ...data,
+          created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+          subscribed_at: data.subscribed_at?.toDate?.()?.toISOString() || data.subscribed_at,
+          unsubscribed_at: data.unsubscribed_at?.toDate?.()?.toISOString() || data.unsubscribed_at
+        } as NewsletterSubscription);
+      });
+      
+      setSubscriptions(subscriptionsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar suscripciones');
     } finally {
@@ -181,32 +213,43 @@ export function useNewsletterSubscriptions() {
   const subscribe = async (email: string, name?: string, preferences?: Record<string, unknown>) => {
     try {
       // Verificar si ya existe una suscripción activa
-      const { data: existing } = await supabase
-        .from('newsletter_subscriptions')
-        .select('*')
-        .eq('email', email)
-        .eq('is_active', true)
-        .single();
+      const subscriptionsRef = collection(db, 'newsletter_subscriptions');
+      const q = query(
+        subscriptionsRef, 
+        where('email', '==', email),
+        where('is_active', '==', true)
+      );
+      const existingSnapshot = await getDocs(q);
 
-      if (existing) {
+      if (!existingSnapshot.empty) {
         throw new Error('Este email ya está suscrito al newsletter');
       }
 
-      const { data, error } = await supabase
-        .from('newsletter_subscriptions')
-        .insert([{
-          email,
-          name,
-          preferences,
-          is_active: true,
-          subscribed_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      await fetchSubscriptions();
-      return data;
+      const newSubscription = {
+        email,
+        name,
+        preferences,
+        is_active: true,
+        created_at: serverTimestamp(),
+        subscribed_at: serverTimestamp()
+      };
+      
+      const docRef = await addDoc(subscriptionsRef, newSubscription);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const createdSubscription = {
+          id: docSnap.id,
+          ...data,
+          created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+          subscribed_at: data.subscribed_at?.toDate?.()?.toISOString() || data.subscribed_at
+        } as NewsletterSubscription;
+        
+        await fetchSubscriptions();
+        return createdSubscription;
+      }
+      throw new Error('Error al crear la suscripción');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al suscribirse');
       throw err;
@@ -215,15 +258,19 @@ export function useNewsletterSubscriptions() {
 
   const unsubscribe = async (email: string) => {
     try {
-      const { error } = await supabase
-        .from('newsletter_subscriptions')
-        .update({
+      const subscriptionsRef = collection(db, 'newsletter_subscriptions');
+      const q = query(subscriptionsRef, where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+      
+      const updatePromises = querySnapshot.docs.map(docSnapshot => {
+        const subscriptionRef = doc(db, 'newsletter_subscriptions', docSnapshot.id);
+        return updateDoc(subscriptionRef, {
           is_active: false,
-          unsubscribed_at: new Date().toISOString()
-        })
-        .eq('email', email);
-
-      if (error) throw error;
+          unsubscribed_at: serverTimestamp()
+        });
+      });
+      
+      await Promise.all(updatePromises);
       await fetchSubscriptions();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al desuscribirse');
@@ -232,13 +279,20 @@ export function useNewsletterSubscriptions() {
 
   const updatePreferences = async (email: string, preferences: Record<string, unknown>) => {
     try {
-      const { error } = await supabase
-        .from('newsletter_subscriptions')
-        .update({ preferences })
-        .eq('email', email)
-        .eq('is_active', true);
-
-      if (error) throw error;
+      const subscriptionsRef = collection(db, 'newsletter_subscriptions');
+      const q = query(
+        subscriptionsRef, 
+        where('email', '==', email),
+        where('is_active', '==', true)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const updatePromises = querySnapshot.docs.map(docSnapshot => {
+        const subscriptionRef = doc(db, 'newsletter_subscriptions', docSnapshot.id);
+        return updateDoc(subscriptionRef, { preferences });
+      });
+      
+      await Promise.all(updatePromises);
       await fetchSubscriptions();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al actualizar preferencias');
@@ -296,16 +350,12 @@ export function useEmailService() {
 
       // Aquí se integraría con un servicio de email como SendGrid, Resend, etc.
       // Por ahora, solo actualizamos el estado del mensaje
-      const { error } = await supabase
-        .from('contact_messages')
-        .update({
-          status: 'responded',
-          response,
-          responded_at: new Date().toISOString()
-        })
-        .eq('id', messageId);
-
-      if (error) throw error;
+      const messageRef = doc(db, 'contact_messages', messageId);
+      await updateDoc(messageRef, {
+        status: 'responded',
+        response,
+        responded_at: serverTimestamp()
+      });
 
       // TODO: Implementar envío real de email
       console.log('Email enviado a:', recipientEmail);
@@ -342,15 +392,21 @@ export function useEmailService() {
       setError(null);
 
       // Obtener emails de usuarios registrados al evento
-      const { data: registrations } = await supabase
-        .from('event_registrations')
-        .select(`
-          profiles!inner(email)
-        `)
-        .eq('event_id', eventId)
-        .eq('status', 'confirmed');
-
-      const emails = registrations?.map(r => r.profiles?.email).filter(Boolean) || [];
+      const registrationsRef = collection(db, 'event_registrations');
+      const q = query(
+        registrationsRef,
+        where('event_id', '==', eventId),
+        where('status', '==', 'confirmed')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const emails: string[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.user_email) {
+          emails.push(data.user_email);
+        }
+      });
       
       if (emails.length > 0) {
         // TODO: Implementar envío de notificaciones de evento

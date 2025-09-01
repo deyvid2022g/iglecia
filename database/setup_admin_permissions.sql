@@ -17,7 +17,7 @@ BEGIN
         -- Insertar o actualizar el perfil de administrador
         INSERT INTO public.profiles (
             id,
-            name,
+            full_name,
             email,
             role,
             is_active,
@@ -37,7 +37,7 @@ BEGIN
         ON CONFLICT (id) DO UPDATE SET
             role = 'admin',
             is_active = true,
-            name = 'Administrador Lugar de Refugio',
+            full_name = 'Administrador Lugar de Refugio',
             bio = 'Administrador principal de la iglesia Lugar de Refugio',
             updated_at = NOW();
             

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
+import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight } from 'lucide-react';
 
@@ -17,7 +17,7 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { signIn, signUp, loading, user } = useSupabaseAuth();
+  const { signIn, signUp, loading, user } = useFirebaseAuth();
   const isAuthenticated = !!user;
   const navigate = useNavigate();
   const location = useLocation();
@@ -70,23 +70,15 @@ export function LoginPage() {
     
     try {
       if (isLogin) {
-        const { error } = await signIn(formData.email, formData.password);
-        if (error) {
-          setErrors({ submit: 'Credenciales incorrectas. Verifica tu email y contraseña.' });
-        }
+        await signIn(formData.email, formData.password);
       } else {
-        const { error } = await signUp(formData.email, formData.password, {
-          full_name: formData.name,
-          phone: formData.phone
-        });
-        if (error) {
-          setErrors({ submit: error.message || 'Error al registrar usuario.' });
-        } else {
-          setErrors({ submit: '' });
-          alert('Registro exitoso. Revisa tu correo para confirmar tu cuenta.');
-        }
+        await signUp(formData.email, formData.password, formData.name);
       }
-    } catch (_) {
+      setErrors({ submit: '' });
+      if (!isLogin) {
+        alert('Registro exitoso. Revisa tu correo para confirmar tu cuenta.');
+      }
+    } catch (error: any) {
       setErrors({ submit: 'Ocurrió un error. Inténtalo de nuevo.' });
     } finally {
       setIsSubmitting(false);
@@ -124,23 +116,23 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 pt-20 md:pt-24">
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <Link to="/" className="inline-flex items-center space-x-3 mb-8">
+          <Link to="/" className="inline-flex items-center justify-center space-x-2 sm:space-x-3 mb-6 sm:mb-8">
             <img 
               src="/trabajo.png" 
               alt="Iglesia Vida Nueva" 
-              className="w-12 h-12 object-contain bg-black rounded-full p-2"
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain bg-black rounded-full p-1.5 sm:p-2"
             />
-            <span className="font-semibold text-xl">Vida Nueva</span>
+            <span className="font-semibold text-lg sm:text-xl text-gray-900">Vida Nueva</span>
           </Link>
           
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 px-4">
             {isLogin ? 'Bienvenido de vuelta' : 'Únete a la familia'}
           </h2>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600 px-4 max-w-md mx-auto leading-relaxed">
             {isLogin 
               ? 'Accede a tu cuenta para continuar tu caminar espiritual'
               : 'Crea tu cuenta y sé parte de nuestra comunidad de fe'
@@ -148,18 +140,7 @@ export function LoginPage() {
           </p>
         </div>
 
-        {/* Demo Credentials */}
-        {isLogin && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-            <h4 className="font-semibold text-blue-800 mb-2">Credenciales de prueba:</h4>
-            <div className="space-y-1 text-blue-700">
-              <div><strong>Admin:</strong> pastor@iglesiavidanueva.com / admin123</div>
-              <div><strong>Pastor:</strong> maria@iglesiavidanueva.com / pastor123</div>
-              <div><strong>Editor:</strong> carlos@iglesiavidanueva.com / editor123</div>
-              <div><strong>Miembro:</strong> ana@ejemplo.com / member123</div>
-            </div>
-          </div>
-        )}
+
 
         {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -359,6 +340,8 @@ export function LoginPage() {
           </div>
         </div>
       </div>
+      
+
     </div>
   );
 }

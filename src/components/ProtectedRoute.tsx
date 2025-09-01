@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
+import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
 import { LoadingSpinner } from './LoadingSpinner';
 
 interface ProtectedRouteProps {
@@ -15,7 +15,7 @@ export function ProtectedRoute({
   requiredRole, 
   adminOnly = false 
 }: ProtectedRouteProps) {
-  const { user, profile, loading, isAuthenticated } = useSupabaseAuth();
+  const { user, profile, loading, isAuthenticated } = useFirebaseAuth();
   
   // Funciones de permisos simplificadas basadas en el usuario
   const hasPermission = (permission: string): boolean => {
@@ -23,12 +23,12 @@ export function ProtectedRoute({
     // Los admins tienen todos los permisos
     if (profile.role === 'admin') return true;
     // Lógica básica de permisos por rol
-    const rolePermissions = {
+    const rolePermissions: Record<string, string[]> = {
       pastor: ['manage_content', 'manage_events', 'view_donations'],
       leader: ['manage_content', 'manage_events'],
       member: []
     };
-    return rolePermissions[profile.role]?.includes(permission) || false;
+    return rolePermissions[profile.role || '']?.includes(permission) || false;
   };
   
   const hasRole = (role: string): boolean => {

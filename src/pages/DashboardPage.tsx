@@ -47,7 +47,7 @@ export function DashboardPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [events, setEvents] = useState<Event[]>([]);
   const [sermons, setSermons] = useState<Sermon[]>([]);
-  const { createSermon, updateSermon, deleteSermon } = useSermons();
+  const { createSermon, updateSermon, deleteSermon, refreshSermons } = useSermons();
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -117,32 +117,52 @@ export function DashboardPage() {
         // Usar datos de ejemplo si no hay datos guardados
         setSermons([
         {
-          id: 1,
+          id: '1',
+          slug: 'disenados-para-la-gloria-de-dios',
           title: 'Diseñados para la Gloria de Dios',
-          speaker: 'Pastor Reynel Dueñas',
-          date: '2025-01-06',
+          speaker_name: 'Pastor Reynel Dueñas',
+          preached_date: '2025-01-06',
           duration: '38:20',
-          thumbnail: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
+          thumbnail_url: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
           description: 'Descubre tu identidad divina y camina en la excelencia para la cual fuiste creado.',
           tags: ['identidad', 'propósito', 'gloria'],
-          videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-          audioUrl: '/audio/sermon-001.mp3',
+          video_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+          audio_url: '/audio/sermon-001.mp3',
+          transcript: undefined,
           has_transcript: true,
-          viewCount: 1204
+          view_count: 1204,
+          like_count: 0,
+          comment_count: 0,
+          category_id: undefined,
+          is_published: true,
+          featured: false,
+          created_by: undefined,
+          created_at: '2025-01-06T00:00:00Z',
+          updated_at: '2025-01-06T00:00:00Z'
         },
         {
-          id: 2,
+          id: '2',
+          slug: 'el-corazon-del-padre-revelado',
           title: 'El Corazón del Padre Revelado',
-          speaker: 'Pastor Reynel Dueñas',
-          date: '2025-01-13',
+          speaker_name: 'Pastor Reynel Dueñas',
+          preached_date: '2025-01-13',
           duration: '35:15',
-          thumbnail: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
+          thumbnail_url: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&fit=crop',
           description: 'Una revelación poderosa del amor incondicional del Padre celestial.',
           tags: ['amor paternal', 'servicio', 'revelación'],
-          videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-          audioUrl: '/audio/sermon-002.mp3',
+          video_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+          audio_url: '/audio/sermon-002.mp3',
+          transcript: undefined,
           has_transcript: true,
-          viewCount: 892
+          view_count: 892,
+          like_count: 0,
+          comment_count: 0,
+          category_id: undefined,
+          is_published: true,
+          featured: false,
+          created_by: undefined,
+          created_at: '2025-01-13T00:00:00Z',
+          updated_at: '2025-01-13T00:00:00Z'
         }
       ]);
       }
@@ -236,13 +256,13 @@ export function DashboardPage() {
         const result = await updateSermon(currentSermon.id.toString(), {
           title: sermonData.title,
           description: sermonData.description,
-          speaker: sermonData.speaker,
-          sermon_date: sermonData.date,
-          duration: sermonData.duration || null,
+          speaker_name: sermonData.speaker,
+          preached_date: sermonData.date,
+          duration: sermonData.duration || undefined,
           video_url: sermonData.videoUrl,
           thumbnail_url: sermonData.thumbnail,
           tags: sermonData.tags ? sermonData.tags.split(',').map((tag: string) => tag.trim()) : [],
-          has_transcript: sermonData.has_transcript || false
+          has_transcript: sermonData.hasTranscript || false
         });
         
         if (result.error) {
@@ -254,13 +274,13 @@ export function DashboardPage() {
           slug: sermonData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
           title: sermonData.title,
           description: sermonData.description,
-          speaker: sermonData.speaker,
-          sermon_date: sermonData.date,
-          duration: sermonData.duration || null,
+          speaker_name: sermonData.speaker,
+          preached_date: sermonData.date,
+          duration: sermonData.duration || undefined,
           video_url: sermonData.videoUrl,
           thumbnail_url: sermonData.thumbnail,
           tags: sermonData.tags ? sermonData.tags.split(',').map((tag: string) => tag.trim()) : [],
-          has_transcript: sermonData.has_transcript || false,
+          has_transcript: sermonData.hasTranscript || false,
           is_published: true,
           featured: false
         });
@@ -352,7 +372,11 @@ export function DashboardPage() {
   };
 
   // Verificar si el usuario está autenticado y tiene permisos
+  console.log('Debug Dashboard - User:', user);
+  console.log('Debug Dashboard - Profile:', profile);
+  console.log('Debug Dashboard - Profile Role:', profile?.role);
   const isAdmin = profile?.role === 'admin' || profile?.role === 'pastor' || profile?.role === 'leader';
+  console.log('Debug Dashboard - isAdmin:', isAdmin);
 
   // Mostrar loading mientras se verifica la autenticación
   if (authLoading) {
@@ -442,7 +466,7 @@ export function DashboardPage() {
               <div className="flex items-center space-x-4 mb-4">
                 <img 
                   src={profile?.avatar_url || '/trabajo.png'} 
-                  alt={profile?.full_name || 'Usuario'}
+                  alt={profile?.name || 'Usuario'}
                   className="w-16 h-16 rounded-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -451,7 +475,7 @@ export function DashboardPage() {
                   }}
                 />
                 <div>
-                  <h2 className="text-xl font-semibold">{profile?.full_name}</h2>
+                  <h2 className="text-xl font-semibold">{profile?.name}</h2>
                 <p className="text-gray-600 capitalize">{profile?.role}</p>
                 </div>
               </div>
@@ -787,10 +811,10 @@ export function DashboardPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {sermon.speaker}
+                          {sermon.speaker_name}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(sermon.sermon_date).toLocaleDateString()}
+                          {new Date(sermon.preached_date).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {sermon.duration}
@@ -868,7 +892,7 @@ export function DashboardPage() {
                             name="speaker"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Nombre del predicador"
-                            defaultValue={currentSermon?.speaker}
+                            defaultValue={currentSermon?.speaker_name}
                             required
                           />
                         </div>
@@ -878,7 +902,7 @@ export function DashboardPage() {
                             type="date" 
                             name="date"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            defaultValue={currentSermon?.sermon_date}
+                            defaultValue={currentSermon?.preached_date}
                             required
                           />
                         </div>

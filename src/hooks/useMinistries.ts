@@ -1,6 +1,42 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, type Ministry } from '../lib/supabase'
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit as firestoreLimit,
+  serverTimestamp
+} from 'firebase/firestore'
+import { db } from '../lib/firebase'
 import { useAuth } from './useAuth'
+
+export interface Ministry {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  slug: string;
+  description: string;
+  leader_id?: string;
+  target_age_group?: string;
+  meeting_day?: string;
+  meeting_time?: string;
+  meeting_location?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  image_url?: string;
+  is_active: boolean;
+  display_order: number;
+  requirements?: string;
+  benefits?: string;
+  social_links?: Record<string, string>;
+}
 
 export interface MinistriesState {
   ministries: Ministry[]
@@ -34,39 +70,51 @@ export const useMinistries = (options?: {
       setLoading(true)
       setError(null)
 
-      let query = supabase
-        .from('ministries')
-        .select(`
-          *,
-          profiles!ministries_leader_id_fkey(
-            name,
-            avatar_url,
-            email
-          )
-        `)
-        .order('display_order', { ascending: true })
+      const ministriesRef = collection(db, 'ministries')
+      let q = query(ministriesRef, orderBy('display_order', 'asc'))
 
       // Aplicar filtros
       if (options?.active !== undefined) {
-        query = query.eq('is_active', options.active)
+        q = query(q, where('is_active', '==', options.active))
       }
 
       if (options?.targetAgeGroup) {
-        query = query.eq('target_age_group', options.targetAgeGroup)
+        q = query(q, where('target_age_group', '==', options.targetAgeGroup))
       }
 
       if (options?.limit) {
-        query = query.limit(options.limit)
+        q = query(q, firestoreLimit(options.limit))
       }
 
-      const { data, error } = await query
-
-      if (error) {
-        setError(error.message)
-        console.error('Error fetching ministries:', error)
-      } else {
-        setMinistries(data || [])
-      }
+      const querySnapshot = await getDocs(q)
+      const ministriesData: Ministry[] = []
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        ministriesData.push({
+          id: doc.id,
+          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          name: data.name,
+          slug: data.slug,
+          description: data.description,
+          leader_id: data.leader_id,
+          target_age_group: data.target_age_group,
+          meeting_day: data.meeting_day,
+          meeting_time: data.meeting_time,
+          meeting_location: data.meeting_location,
+          contact_email: data.contact_email,
+          contact_phone: data.contact_phone,
+          image_url: data.image_url,
+          is_active: data.is_active,
+          display_order: data.display_order || 0,
+          requirements: data.requirements,
+          benefits: data.benefits,
+          social_links: data.social_links || {}
+        })
+      })
+      
+      setMinistries(ministriesData)
     } catch (err) {
       setError('Error al cargar ministerios')
       console.error('Error in fetchMinistries:', err)
@@ -81,154 +129,221 @@ export const useMinistries = (options?: {
 
   const createMinistry = async (ministryData: Omit<Ministry, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const { data, error } = await supabase
-        .from('ministries')
-        .insert(ministryData)
-        .select()
-        .single()
+      const ministriesRef = collection(db, 'ministries')
+      const docRef = await addDoc(ministriesRef, {
+        ...ministryData,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      })
 
-      if (!error && data) {
-        setMinistries(prev => [...prev, data].sort((a, b) => a.display_order - b.display_order))
+      const newDoc = await getDoc(docRef)
+      if (newDoc.exists()) {
+        const data = newDoc.data()
+        const newMinistry: Ministry = {
+          id: newDoc.id,
+          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          name: data.name,
+          slug: data.slug,
+          description: data.description,
+          leader_id: data.leader_id,
+          target_age_group: data.target_age_group,
+          meeting_day: data.meeting_day,
+          meeting_time: data.meeting_time,
+          meeting_location: data.meeting_location,
+          contact_email: data.contact_email,
+          contact_phone: data.contact_phone,
+          image_url: data.image_url,
+          is_active: data.is_active,
+          display_order: data.display_order || 0,
+          requirements: data.requirements,
+          benefits: data.benefits,
+          social_links: data.social_links || {}
+        }
+        
+        setMinistries(prev => [...prev, newMinistry].sort((a, b) => a.display_order - b.display_order))
+        return { data: newMinistry, error: null }
       }
 
-      return { data, error }
+      return { data: null, error: new Error('Failed to create ministry') }
     } catch (err) {
       console.error('Error creating ministry:', err)
-      return { data: null, error: err }
+      return { data: null, error: err as Error }
     }
   }
 
   const updateMinistry = async (id: string, updates: Partial<Ministry>) => {
     try {
-      const { data, error } = await supabase
-        .from('ministries')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      const ministryRef = doc(db, 'ministries', id)
+      await updateDoc(ministryRef, {
+        ...updates,
+        updated_at: serverTimestamp()
+      })
 
-      if (!error && data) {
-        setMinistries(prev => prev.map(ministry => ministry.id === id ? data : ministry))
+      const updatedDoc = await getDoc(ministryRef)
+      if (updatedDoc.exists()) {
+        const data = updatedDoc.data()
+        const updatedMinistry: Ministry = {
+          id: updatedDoc.id,
+          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          name: data.name,
+          slug: data.slug,
+          description: data.description,
+          leader_id: data.leader_id,
+          target_age_group: data.target_age_group,
+          meeting_day: data.meeting_day,
+          meeting_time: data.meeting_time,
+          meeting_location: data.meeting_location,
+          contact_email: data.contact_email,
+          contact_phone: data.contact_phone,
+          image_url: data.image_url,
+          is_active: data.is_active,
+          display_order: data.display_order || 0,
+          requirements: data.requirements,
+          benefits: data.benefits,
+          social_links: data.social_links || {}
+        }
+        
+        setMinistries(prev => prev.map(ministry => ministry.id === id ? updatedMinistry : ministry))
+        return { data: updatedMinistry, error: null }
       }
 
-      return { data, error }
+      return { data: null, error: new Error('Ministry not found') }
     } catch (err) {
       console.error('Error updating ministry:', err)
-      return { data: null, error: err }
+      return { data: null, error: err as Error }
     }
   }
 
   const deleteMinistry = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('ministries')
-        .delete()
-        .eq('id', id)
-
-      if (!error) {
-        setMinistries(prev => prev.filter(ministry => ministry.id !== id))
-      }
-
-      return { error }
+      const ministryRef = doc(db, 'ministries', id)
+      await deleteDoc(ministryRef)
+      
+      setMinistries(prev => prev.filter(ministry => ministry.id !== id))
+      return { error: null }
     } catch (err) {
       console.error('Error deleting ministry:', err)
-      return { error: err }
+      return { error: err as Error }
     }
   }
 
   const getMinistryBySlug = async (slug: string) => {
     try {
-      const { data, error } = await supabase
-        .from('ministries')
-        .select(`
-          *,
-          profiles!ministries_leader_id_fkey(
-            name,
-            avatar_url,
-            email,
-            bio
-          ),
-          ministry_activities(
-            id,
-            title,
-            description,
-            schedule,
-            location,
-            icon,
-            is_active
-          )
-        `)
-        .eq('slug', slug)
-        .single()
+      const ministriesRef = collection(db, 'ministries')
+      const q = query(ministriesRef, where('slug', '==', slug))
+      const querySnapshot = await getDocs(q)
+      
+      if (querySnapshot.empty) {
+        return { data: null, error: new Error('Ministry not found') }
+      }
+      
+      const doc = querySnapshot.docs[0]
+      const data = doc.data()
+      const ministry: Ministry = {
+        id: doc.id,
+        created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+        updated_at: data.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+        name: data.name,
+        slug: data.slug,
+        description: data.description,
+        leader_id: data.leader_id,
+        target_age_group: data.target_age_group,
+        meeting_day: data.meeting_day,
+        meeting_time: data.meeting_time,
+        meeting_location: data.meeting_location,
+        contact_email: data.contact_email,
+        contact_phone: data.contact_phone,
+        image_url: data.image_url,
+        is_active: data.is_active,
+        display_order: data.display_order || 0,
+        requirements: data.requirements,
+        benefits: data.benefits,
+        social_links: data.social_links || {}
+      }
 
-      return { data, error }
+      return { data: ministry, error: null }
     } catch (err) {
       console.error('Error getting ministry by slug:', err)
-      return { data: null, error: err }
+      return { data: null, error: err as Error }
     }
   }
 
   const joinMinistry = async (ministryId: string, role: string = 'member') => {
     try {
       if (!user) {
-        return { error: { message: 'Debes iniciar sesión para unirte a un ministerio' } }
+        return { error: new Error('Debes iniciar sesión para unirte a un ministerio') }
       }
 
-      const { error } = await supabase
-        .from('ministry_members')
-        .insert({
-          ministry_id: ministryId,
-          user_id: user.id,
-          role,
-          is_active: true
-        })
+      const ministryMembersRef = collection(db, 'ministry_members')
+      await addDoc(ministryMembersRef, {
+        ministry_id: ministryId,
+        user_id: user.uid,
+        role,
+        is_active: true,
+        joined_at: serverTimestamp()
+      })
 
-      return { error }
+      return { error: null }
     } catch (err) {
       console.error('Error joining ministry:', err)
-      return { error: err }
+      return { error: err as Error }
     }
   }
 
   const leaveMinistry = async (ministryId: string) => {
     try {
       if (!user) {
-        return { error: { message: 'Debes iniciar sesión' } }
+        return { error: new Error('Debes iniciar sesión') }
       }
 
-      const { error } = await supabase
-        .from('ministry_members')
-        .update({ is_active: false })
-        .eq('ministry_id', ministryId)
-        .eq('user_id', user.id)
-
-      return { error }
+      const ministryMembersRef = collection(db, 'ministry_members')
+      const q = query(
+        ministryMembersRef, 
+        where('ministry_id', '==', ministryId),
+        where('user_id', '==', user.uid)
+      )
+      const querySnapshot = await getDocs(q)
+      
+      const updatePromises = querySnapshot.docs.map(doc => 
+        updateDoc(doc.ref, { is_active: false })
+      )
+      
+      await Promise.all(updatePromises)
+      return { error: null }
     } catch (err) {
       console.error('Error leaving ministry:', err)
-      return { error: err }
+      return { error: err as Error }
     }
   }
 
   const getMinistryMembers = async (ministryId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('ministry_members')
-        .select(`
-          *,
-          profiles(
-            name,
-            avatar_url,
-            email
-          )
-        `)
-        .eq('ministry_id', ministryId)
-        .eq('is_active', true)
-        .order('joined_at', { ascending: false })
+      const ministryMembersRef = collection(db, 'ministry_members')
+      const q = query(
+        ministryMembersRef,
+        where('ministry_id', '==', ministryId),
+        where('is_active', '==', true),
+        orderBy('joined_at', 'desc')
+      )
+      const querySnapshot = await getDocs(q)
+      
+      const membersData: { id: string; name: string; role: string }[] = []
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        membersData.push({
+          id: doc.id,
+          name: data.name || 'Usuario',
+          role: data.role || 'member'
+        })
+      })
 
-      return { data, error }
+      return { data: membersData, error: null }
     } catch (err) {
       console.error('Error getting ministry members:', err)
-      return { data: null, error: err }
+      return { data: null, error: err as Error }
     }
   }
 
@@ -265,34 +380,41 @@ export const useMinistry = (slug: string) => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('ministries')
-          .select(`
-            *,
-            profiles!ministries_leader_id_fkey(
-              name,
-              avatar_url,
-              email,
-              bio
-            ),
-            ministry_activities(
-              id,
-              title,
-              description,
-              schedule,
-              location,
-              icon,
-              is_active
-            )
-          `)
-          .eq('slug', slug)
-          .single()
-
-        if (error) {
-          setError(error.message)
-        } else {
-          setMinistry(data)
+        const ministriesRef = collection(db, 'ministries')
+        const q = query(ministriesRef, where('slug', '==', slug))
+        const querySnapshot = await getDocs(q)
+        
+        if (querySnapshot.empty) {
+          setError('Ministerio no encontrado')
+          setMinistry(null)
+          return
         }
+        
+        const doc = querySnapshot.docs[0]
+        const data = doc.data()
+        const ministryData: Ministry = {
+          id: doc.id,
+          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          name: data.name,
+          slug: data.slug,
+          description: data.description,
+          leader_id: data.leader_id,
+          target_age_group: data.target_age_group,
+          meeting_day: data.meeting_day,
+          meeting_time: data.meeting_time,
+          meeting_location: data.meeting_location,
+          contact_email: data.contact_email,
+          contact_phone: data.contact_phone,
+          image_url: data.image_url,
+          is_active: data.is_active,
+          display_order: data.display_order || 0,
+          requirements: data.requirements,
+          benefits: data.benefits,
+          social_links: data.social_links || {}
+        }
+        
+        setMinistry(ministryData)
       } catch (err) {
         setError('Error al cargar ministerio')
         console.error('Error fetching ministry:', err)
@@ -334,35 +456,32 @@ export const usePublicChurchSettings = () => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('church_settings')
-          .select('*')
-          .eq('is_public', true)
-
-        if (error) {
-          setError(error.message)
-        } else {
-          const settingsObj = (data || []).reduce((acc, setting) => {
-            let value = setting.value
-            
-            if (setting.type === 'number') {
-              value = parseFloat(value)
-            } else if (setting.type === 'boolean') {
-              value = value === 'true'
-            } else if (setting.type === 'json') {
-              try {
-                value = JSON.parse(value)
-              } catch {
-                value = setting.value
-              }
-            }
-            
-            acc[setting.key] = value
-            return acc
-          }, {} as Record<string, unknown>)
+        const settingsRef = collection(db, 'church_settings')
+        const q = query(settingsRef, where('is_public', '==', true))
+        const querySnapshot = await getDocs(q)
+        
+        const settingsObj: Record<string, unknown> = {}
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          let value = data.value
           
-          setSettings(settingsObj)
-        }
+          if (data.type === 'number') {
+            value = parseFloat(value)
+          } else if (data.type === 'boolean') {
+            value = value === 'true'
+          } else if (data.type === 'json') {
+            try {
+              value = JSON.parse(value)
+            } catch {
+              value = data.value
+            }
+          }
+          
+          settingsObj[data.key] = value
+        })
+        
+        setSettings(settingsObj)
       } catch (err) {
         setError('Error al cargar configuraciones')
         console.error('Error fetching church settings:', err)

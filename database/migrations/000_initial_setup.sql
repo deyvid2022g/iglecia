@@ -149,6 +149,10 @@ CREATE POLICY "Public profiles are viewable by everyone" ON profiles
 CREATE POLICY "Users can insert their own profile" ON profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
+-- Política especial para permitir inserción automática durante registro
+CREATE POLICY "Allow automatic profile creation" ON profiles
+  FOR INSERT WITH CHECK (true);
+
 CREATE POLICY "Users can update their own profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
@@ -164,6 +168,7 @@ CREATE POLICY "Only admins can delete profiles" ON profiles
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
+  -- Usar SECURITY DEFINER para bypass RLS durante la creación automática del perfil
   INSERT INTO public.profiles (id, full_name, email)
   VALUES (
     NEW.id,
@@ -171,8 +176,16 @@ BEGIN
     NEW.email
   );
   RETURN NEW;
+EXCEPTION
+  WHEN unique_violation THEN
+    -- Si el perfil ya existe, no hacer nada
+    RETURN NEW;
+  WHEN OTHERS THEN
+    -- Log del error pero no fallar el registro
+    RAISE WARNING 'Error creating profile for user %: %', NEW.id, SQLERRM;
+    RETURN NEW;
 END;
-$$ language 'plpgsql' SECURITY DEFINER;
+$$ language 'plpgsql' SECURITY DEFINER SET search_path = public, auth;
 
 -- Trigger para crear perfil automáticamente
 CREATE TRIGGER on_auth_user_created

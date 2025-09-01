@@ -1,6 +1,45 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, type Sermon } from '../lib/supabase'
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit as firestoreLimit,
+  serverTimestamp,
+  increment
+} from 'firebase/firestore'
+import { db } from '../lib/firebase'
 import { useAuth } from './useAuth'
+
+// Define Sermon type for Firebase
+export interface Sermon {
+  id: string
+  title: string
+  description: string
+  speaker_name: string
+  preached_date: string
+  video_url?: string
+  audio_url?: string
+  transcript?: string
+  tags?: string[]
+  category_id?: string
+  series_id?: string
+  is_published: boolean
+  featured: boolean
+  view_count: number
+  like_count: number
+  comment_count: number
+  created_by: string
+  created_at: string
+  updated_at: string
+  slug: string
+}
 
 export interface SermonsState {
   sermons: Sermon[]
@@ -35,52 +74,45 @@ export const useSermons = (options?: {
       setLoading(true)
       setError(null)
 
-      let query = supabase
-        .from('sermons')
-        .select(`
-          *,
-          sermon_categories(
-            id,
-            name,
-            description,
-            color
-          ),
-          profiles!sermons_created_by_fkey(
-            name,
-            avatar_url
-          )
-        `)
-        .order('sermon_date', { ascending: false })
+      const sermonsRef = collection(db, 'sermons')
+      let firestoreQuery = query(sermonsRef, orderBy('preached_date', 'desc'))
 
       // Aplicar filtros
       if (options?.published !== undefined) {
-        query = query.eq('is_published', options.published)
+        firestoreQuery = query(firestoreQuery, where('is_published', '==', options.published))
       }
 
       if (options?.speaker) {
-        query = query.eq('speaker', options.speaker)
+        firestoreQuery = query(firestoreQuery, where('speaker_name', '==', options.speaker))
       }
 
       if (options?.category) {
-        query = query.eq('category_id', options.category)
+        firestoreQuery = query(firestoreQuery, where('category_id', '==', options.category))
       }
 
       if (options?.featured !== undefined) {
-        query = query.eq('featured', options.featured)
+        firestoreQuery = query(firestoreQuery, where('featured', '==', options.featured))
       }
 
       if (options?.limit) {
-        query = query.limit(options.limit)
+        firestoreQuery = query(firestoreQuery, firestoreLimit(options.limit))
       }
 
-      const { data, error } = await query
+      const querySnapshot = await getDocs(firestoreQuery)
+      const sermonsData: Sermon[] = []
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        sermonsData.push({
+          id: doc.id,
+          ...data,
+          created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+          preached_date: data.preached_date?.toDate?.()?.toISOString() || data.preached_date
+        } as Sermon)
+      })
 
-      if (error) {
-        setError(error.message)
-        console.error('Error fetching sermons:', error)
-      } else {
-        setSermons(data || [])
-      }
+      setSermons(sermonsData)
     } catch (err) {
       setError('Error al cargar sermones')
       console.error('Error in fetchSermons:', err)
@@ -95,162 +127,179 @@ export const useSermons = (options?: {
 
   const createSermon = async (sermonData: Omit<Sermon, 'id' | 'created_at' | 'updated_at' | 'view_count' | 'like_count' | 'comment_count'>) => {
     try {
-      const { data, error } = await supabase
-        .from('sermons')
-        .insert({
-          ...sermonData,
-          created_by: user?.id,
-          view_count: 0,
-          like_count: 0,
-          comment_count: 0
-        })
-        .select()
-        .single()
-
-      if (!error && data) {
-        setSermons(prev => [data, ...prev])
+      if (!user) {
+        return { data: null, error: new Error('Usuario no autenticado') }
       }
 
-      return { data, error }
+      const newSermon = {
+        ...sermonData,
+        created_by: user.uid,
+        view_count: 0,
+        like_count: 0,
+        comment_count: 0,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      }
+
+      const sermonsRef = collection(db, 'sermons')
+      const docRef = await addDoc(sermonsRef, newSermon)
+      
+      // Obtener el documento creado
+      const createdDoc = await getDoc(docRef)
+      const createdData = createdDoc.data()
+      
+      const sermon: Sermon = {
+        id: docRef.id,
+        ...createdData,
+        created_at: createdData?.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+        updated_at: createdData?.updated_at?.toDate?.()?.toISOString() || new Date().toISOString()
+      } as Sermon
+
+      // Actualizar la lista local
+      await fetchSermons()
+      
+      return { data: sermon, error: null }
     } catch (err) {
       console.error('Error creating sermon:', err)
-      return { data: null, error: err }
+      return { data: null, error: err instanceof Error ? err : new Error('Unknown error occurred') }
     }
   }
 
   const updateSermon = async (id: string, updates: Partial<Sermon>) => {
     try {
-      const { data, error } = await supabase
-        .from('sermons')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
-
-      if (!error && data) {
-        setSermons(prev => prev.map(sermon => sermon.id === id ? data : sermon))
+      const sermonRef = doc(db, 'sermons', id)
+      const updateData = {
+        ...updates,
+        updated_at: serverTimestamp()
       }
+      
+      await updateDoc(sermonRef, updateData)
+      
+      // Obtener el documento actualizado
+      const updatedDoc = await getDoc(sermonRef)
+      const updatedData = updatedDoc.data()
+      
+      const sermon: Sermon = {
+        id: updatedDoc.id,
+        ...updatedData,
+        created_at: updatedData?.created_at?.toDate?.()?.toISOString() || updatedData?.created_at,
+        updated_at: updatedData?.updated_at?.toDate?.()?.toISOString() || new Date().toISOString()
+      } as Sermon
 
-      return { data, error }
+      // Actualizar la lista local
+      setSermons(prev => prev.map(s => 
+        s.id === id ? sermon : s
+      ))
+
+      return { data: sermon, error: null }
     } catch (err) {
       console.error('Error updating sermon:', err)
-      return { data: null, error: err }
+      return { data: null, error: err instanceof Error ? err : new Error('Unknown error occurred') }
     }
   }
 
   const deleteSermon = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('sermons')
-        .delete()
-        .eq('id', id)
+      const sermonRef = doc(db, 'sermons', id)
+      await deleteDoc(sermonRef)
 
-      if (!error) {
-        setSermons(prev => prev.filter(sermon => sermon.id !== id))
-      }
+      // Actualizar la lista local
+      setSermons(prev => prev.filter(sermon => sermon.id !== id))
 
-      return { error }
+      return { error: null }
     } catch (err) {
       console.error('Error deleting sermon:', err)
-      return { error: err }
+      return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
     }
   }
 
   const getSermonBySlug = async (slug: string) => {
     try {
-      const { data, error } = await supabase
-        .from('sermons')
-        .select(`
-          *,
-          sermon_categories(
-            id,
-            name,
-            description,
-            color
-          ),
-          profiles!sermons_created_by_fkey(
-            name,
-            avatar_url
-          )
-        `)
-        .eq('slug', slug)
-        .single()
+      const sermonsRef = collection(db, 'sermons')
+      const q = query(sermonsRef, where('slug', '==', slug))
+      const querySnapshot = await getDocs(q)
+      
+      if (querySnapshot.empty) {
+        return { data: null, error: new Error('Sermón no encontrado') }
+      }
+      
+      const doc = querySnapshot.docs[0]
+      const data = doc.data()
+      
+      const sermon: Sermon = {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+        updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+        preached_date: data.preached_date?.toDate?.()?.toISOString() || data.preached_date
+      } as Sermon
 
-      return { data, error }
+      return { data: sermon, error: null }
     } catch (err) {
       console.error('Error getting sermon by slug:', err)
-      return { data: null, error: err }
+      return { data: null, error: err instanceof Error ? err : new Error('Unknown error occurred') }
     }
   }
 
   const incrementViewCount = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('sermons')
-        .update({
-          view_count: supabase.rpc('increment_view_count', { sermon_id: id })
-        })
-        .eq('id', id)
+      const sermonRef = doc(db, 'sermons', id)
+      await updateDoc(sermonRef, {
+        view_count: increment(1)
+      })
 
-      if (!error) {
-        setSermons(prev => prev.map(sermon => 
-          sermon.id === id 
-            ? { ...sermon, view_count: sermon.view_count + 1 }
-            : sermon
-        ))
-      }
+      setSermons(prev => prev.map(sermon => 
+        sermon.id === id 
+          ? { ...sermon, view_count: sermon.view_count + 1 }
+          : sermon
+      ))
 
-      return { error }
+      return { error: null }
     } catch (err) {
       console.error('Error incrementing view count:', err)
-      return { error: err }
+      return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
     }
   }
 
   const toggleLike = async (sermonId: string) => {
     try {
       if (!user) {
-        return { error: { message: 'Debes iniciar sesión para dar like' } }
+        return { error: new Error('Usuario no autenticado') }
       }
 
-      // Verificar si ya existe el like
-      const { data: existingLike, error: checkError } = await supabase
-        .from('likes')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('content_type', 'sermon')
-        .eq('content_id', sermonId)
-        .single()
+      const likesRef = collection(db, 'sermon_likes')
+      const q = query(likesRef, where('sermon_id', '==', sermonId), where('user_id', '==', user.uid))
+      const querySnapshot = await getDocs(q)
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        return { error: checkError }
-      }
-
-      if (existingLike) {
-        // Quitar like
-        const { error } = await supabase
-          .from('likes')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('content_type', 'sermon')
-          .eq('content_id', sermonId)
-
-        return { error }
+      if (!querySnapshot.empty) {
+        // Eliminar like
+        const likeDoc = querySnapshot.docs[0]
+        await deleteDoc(doc(db, 'sermon_likes', likeDoc.id))
+        
+        // Decrementar contador
+        const sermonRef = doc(db, 'sermons', sermonId)
+        await updateDoc(sermonRef, {
+          like_count: increment(-1)
+        })
       } else {
         // Agregar like
-        const { error } = await supabase
-          .from('likes')
-          .insert({
-            user_id: user.id,
-            content_type: 'sermon',
-            content_id: sermonId
-          })
-
-        return { error }
+        await addDoc(likesRef, {
+          sermon_id: sermonId,
+          user_id: user.uid,
+          created_at: serverTimestamp()
+        })
+        
+        // Incrementar contador
+        const sermonRef = doc(db, 'sermons', sermonId)
+        await updateDoc(sermonRef, {
+          like_count: increment(1)
+        })
       }
+
+      return { error: null }
     } catch (err) {
       console.error('Error toggling like:', err)
-      return { error: err }
+      return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
     }
   }
 
@@ -286,28 +335,26 @@ export const useSermon = (slug: string) => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('sermons')
-          .select(`
-            *,
-            sermon_categories(
-              id,
-              name,
-              description,
-              color
-            ),
-            profiles!sermons_created_by_fkey(
-              name,
-              avatar_url
-            )
-          `)
-          .eq('slug', slug)
-          .single()
-
-        if (error) {
-          setError(error.message)
+        const sermonsRef = collection(db, 'sermons')
+        const q = query(sermonsRef, where('slug', '==', slug))
+        const querySnapshot = await getDocs(q)
+        
+        if (querySnapshot.empty) {
+          setError('Sermón no encontrado')
+          setSermon(null)
         } else {
-          setSermon(data)
+          const doc = querySnapshot.docs[0]
+          const data = doc.data()
+          
+          const sermonData: Sermon = {
+            id: doc.id,
+            ...data,
+            created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+            updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+            preached_date: data.preached_date?.toDate?.()?.toISOString() || data.preached_date
+          } as Sermon
+          
+          setSermon(sermonData)
         }
       } catch (err) {
         setError('Error al cargar sermón')
@@ -360,17 +407,23 @@ export const useSermonCategories = () => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('sermon_categories')
-          .select('*')
-          .eq('is_active', true)
-          .order('name')
-
-        if (error) {
-          setError(error.message)
-        } else {
-          setCategories(data || [])
-        }
+        const categoriesRef = collection(db, 'sermon_categories')
+        const q = query(
+          categoriesRef, 
+          where('is_active', '==', true),
+          orderBy('name')
+        )
+        const querySnapshot = await getDocs(q)
+        
+        const categoriesData: { id: string; name: string; description?: string }[] = []
+        querySnapshot.forEach((doc) => {
+          categoriesData.push({
+            id: doc.id,
+            ...doc.data()
+          } as { id: string; name: string; description?: string })
+        })
+        
+        setCategories(categoriesData)
       } catch (err) {
         setError('Error al cargar categorías')
         console.error('Error fetching categories:', err)
