@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
+import { useAuthContext } from '../contexts/FirebaseAuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight } from 'lucide-react';
 
@@ -17,7 +17,7 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { signIn, signUp, loading, user } = useSupabaseAuth();
+  const { signIn, signUp, loading, user } = useAuthContext();
   const isAuthenticated = !!user;
   const navigate = useNavigate();
   const location = useLocation();

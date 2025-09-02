@@ -14,7 +14,7 @@ import {
   Heart,
   MessageCircle
 } from 'lucide-react';
-import { useEvent } from '../hooks/useEvents';
+import { useEvent } from '../hooks/useEvent';
 
 // Definir interfaz para los comentarios
 interface Comment {
@@ -98,11 +98,12 @@ export function EventDetailPage() {
 
   // Función para compartir el evento
   const shareEvent = async () => {
+    if (!event) return;
     try {
       if (navigator.share) {
         await navigator.share({
           title: event.title,
-          text: `${event.title} - ${formatDate(event.date)}`,
+          text: `${event.title} - ${formatDate(event.event_date)}`,
           url: window.location.href
         });
       } else {
@@ -131,16 +132,18 @@ export function EventDetailPage() {
   };
 
   const addToCalendar = () => {
+    if (!event) return;
     const startDateTime = new Date(`${event.event_date}T${event.start_time}`);
     const endDateTime = new Date(`${event.event_date}T${event.end_time}`);
     
-    const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDateTime.toISOString().replace(/[-:]/g, '').split('.')[0]}Z/${endDateTime.toISOString().replace(/[-:]/g, '').split('.')[0]}Z&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.locations?.full_address || event.locations?.name || 'Ubicación por confirmar')}`;
+    const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDateTime.toISOString().replace(/[-:]/g, '').split('.')[0]}Z/${endDateTime.toISOString().replace(/[-:]/g, '').split('.')[0]}Z&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.location?.full_address || event.location?.name || 'Ubicación por confirmar')}`;
     
     window.open(calendarUrl, '_blank');
   };
 
   const openMap = () => {
-    const address = event.locations?.full_address || event.locations?.name || 'Ubicación por confirmar';
+    if (!event || !event.location) return;
+    const address = event.location?.full_address || event.location?.name || 'Ubicación por confirmar';
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     window.open(mapUrl, '_blank');
   };
@@ -248,7 +251,7 @@ export function EventDetailPage() {
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <MapPin className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-                  <div className="text-sm font-medium">{event.locations?.name || 'Ubicación por confirmar'}</div>
+                  <div className="text-sm font-medium">{event.location?.name || 'Ubicación por confirmar'}</div>
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <Users className="w-6 h-6 mx-auto mb-2 text-gray-600" />
@@ -280,9 +283,9 @@ export function EventDetailPage() {
                 <div className="bg-gray-50 rounded-lg p-6">
                   <div className="flex items-center mb-4">
                     <User className="w-8 h-8 text-gray-600 mr-3" />
-                    <h4 className="text-lg font-semibold">{event.host}</h4>
+                    <h4 className="text-lg font-semibold">{event.host_name}</h4>
                   </div>
-                  <p className="text-gray-700 leading-relaxed">{event.hostBio}</p>
+                  <p className="text-gray-700 leading-relaxed">{event.host_description}</p>
                 </div>
               </div>
 
@@ -292,8 +295,8 @@ export function EventDetailPage() {
                 <div className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h4 className="font-semibold">{event.location.name}</h4>
-                      <p className="text-gray-600">{event.location.fullAddress}</p>
+                      <h4 className="font-semibold">{event.location?.name}</h4>
+                      <p className="text-gray-600">{event.location?.full_address}</p>
                     </div>
                     <button
                       onClick={openMap}

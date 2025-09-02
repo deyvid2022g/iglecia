@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
+import { useAuthContext } from '../contexts/FirebaseAuthContext';
 import { LoadingSpinner } from './LoadingSpinner';
 
 interface ProtectedRouteProps {
@@ -15,7 +15,8 @@ export function ProtectedRoute({
   requiredRole, 
   adminOnly = false 
 }: ProtectedRouteProps) {
-  const { user, profile, loading, isAuthenticated } = useSupabaseAuth();
+  const { user, profile, loading } = useAuthContext();
+  const isAuthenticated = !!user;
   
   // Funciones de permisos simplificadas basadas en el usuario
   const hasPermission = (permission: string): boolean => {

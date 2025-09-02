@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { getEventBySlug } from '../lib/firestore';
-import type { Event } from '../lib/supabase';
+import type { EventWithLocation } from '../lib/supabase';
 
 export const useEvent = (slug: string) => {
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<EventWithLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,14 +18,10 @@ export const useEvent = (slug: string) => {
         setLoading(true);
         setError(null);
         const fetchedEvent = await getEventBySlug(slug);
-        if (fetchedEvent) {
-          setEvent(fetchedEvent);
-        } else {
-          setError('Evento no encontrado');
-        }
+        setEvent(fetchedEvent);
       } catch (err) {
         setError('Error al cargar el evento');
-        console.error(`Error fetching event with slug ${slug}:`, err);
+        console.error('Error in fetchEvent:', err);
       } finally {
         setLoading(false);
       }
