@@ -1,5 +1,5 @@
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { SupabaseAuthProvider } from './contexts/SupabaseAuthContext';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -29,7 +29,6 @@ import './index.css';
 
 function App() {
   return (
-    <SupabaseAuthProvider>
       <Router>
         <ScrollToTop />
         <div className="min-h-screen bg-white text-black font-inter">
@@ -69,7 +68,6 @@ function App() {
           <Footer />
         </div>
       </Router>
-    </SupabaseAuthProvider>
   );
 }
 
