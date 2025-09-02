@@ -1,133 +1,53 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Tag, Search, Filter, Clock } from 'lucide-react';
+import { getBlogPostsWithAuthors, type BlogPostWithAuthor } from '../lib/firestore';
 
 export function BlogPage() {
+  const [posts, setPosts] = useState<BlogPostWithAuthor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
 
-  const categories = ['Fe', 'Familia', 'Comunidad', 'Estudios Bíblicos', 'Testimonios'];
-  
-  const posts = [
-    {
-      id: 1,
-      slug: 'reflexion-esperanza',
-      title: 'Reflexión semanal: La esperanza que no defrauda',
-      excerpt: 'En tiempos de incertidumbre, la esperanza cristiana se convierte en nuestro ancla. Descubre cómo cultivar una esperanza que trasciende las circunstancias.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastor Reynel Dueñas',
-        avatar: '/Pastor Reynel Dueñas P n g.png'
-      },
-      category: 'Fe',
-      tags: ['esperanza', 'vida cristiana', 'reflexión'],
-      publishedAt: '2025-01-25',
-      readTime: 5,
-      featuredImage: 'https://images.pexels.com/photos/289586/pexels-photo-289586.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 234
-    },
-    {
-      id: 2,
-      slug: 'voluntariado-como-ayudar',
-      title: 'Cómo ser voluntario en la iglesia: Una guía práctica',
-      excerpt: 'Servir es una de las formas más hermosas de expresar nuestro amor por Dios y por otros. Te mostramos las diferentes oportunidades de voluntariado disponibles.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastor Reynel Dueñas',
-        avatar: '/Pastor Reynel Dueñas P n g.png'
-      },
-      category: 'Comunidad',
-      tags: ['voluntariado', 'servicio', 'comunidad'],
-      publishedAt: '2025-01-22',
-      readTime: 7,
-      featuredImage: 'https://images.pexels.com/photos/6994925/pexels-photo-6994925.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 189
-    },
-    {
-      id: 3,
-      slug: 'fortaleciendo-matrimonio',
-      title: 'Fortaleciendo el matrimonio con principios bíblicos',
-      excerpt: 'El matrimonio es un regalo de Dios que requiere cuidado constante. Exploramos cinco principios fundamentales para un matrimonio sólido.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastor Reynel Dueñas',
-        avatar: '/Pastor Reynel Dueñas P n g.png'
-      },
-      category: 'Familia',
-      tags: ['matrimonio', 'familia', 'relaciones'],
-      publishedAt: '2025-01-20',
-      readTime: 8,
-      featuredImage: 'https://images.pexels.com/photos/1024993/pexels-photo-1024993.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 312
-    },
-    {
-      id: 4,
-      slug: 'oracion-efectiva',
-      title: 'Los elementos de una oración efectiva',
-      excerpt: 'La oración es mucho más que pedir. Descubre los componentes que hacen que nuestra comunicación con Dios sea más profunda y significativa.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastor Juan Pérez',
-        avatar: 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-      },
-      category: 'Estudios Bíblicos',
-      tags: ['oración', 'espiritualidad', 'crecimiento'],
-      publishedAt: '2025-01-18',
-      readTime: 6,
-      featuredImage: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 156
-    },
-    {
-      id: 5,
-      slug: 'testimonio-transformacion',
-      title: 'Mi testimonio: Cómo Dios transformó mi vida',
-      excerpt: 'La historia de Ana Martínez, quien encontró esperanza y propósito después de años de lucha personal. Un testimonio que inspira y alienta.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Ana Martínez',
-        avatar: 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-      },
-      category: 'Testimonios',
-      tags: ['testimonio', 'transformación', 'esperanza'],
-      publishedAt: '2025-01-15',
-      readTime: 9,
-      featuredImage: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 423
-    },
-    {
-      id: 6,
-      slug: 'crianza-cristiana',
-      title: 'Crianza con valores cristianos en el siglo XXI',
-      excerpt: 'Los desafíos de criar hijos con valores cristianos en un mundo cambiante. Estrategias prácticas para padres comprometidos con la fe.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastora María Gómez',
-        avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-      },
-      category: 'Familia',
-      tags: ['crianza', 'valores', 'educación'],
-      publishedAt: '2025-01-12',
-      readTime: 10,
-      featuredImage: 'https://images.pexels.com/photos/8613049/pexels-photo-8613049.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 278
-    }
-  ];
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        setLoading(true);
+        const fetchedPosts = await getBlogPostsWithAuthors();
+        setPosts(fetchedPosts);
+        setError(null);
+      } catch (err) {
+        setError('Error al cargar las publicaciones del blog.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const allTags = [...new Set(posts.flatMap(post => post.tags))];
+    fetchPosts();
+  }, []);
+
+  const categories = [...new Set(posts.map(p => p.category_id || '').filter(c => c))];
+  const allTags = [...new Set(posts.flatMap(post => post.tags || []))];
 
   const filteredPosts = posts.filter(post => {
+    const authorName = post.author?.full_name || '';
     const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          post.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.author.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || post.category === selectedCategory;
-    const matchesTag = !selectedTag || post.tags.includes(selectedTag);
+                         authorName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || post.category_id === selectedCategory;
+    const matchesTag = !selectedTag || (post.tags && post.tags.includes(selectedTag));
     
     return matchesSearch && matchesCategory && matchesTag;
   });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    const dateObject = date.toDate ? date.toDate() : new Date(date);
+    return dateObject.toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -140,10 +60,17 @@ export function BlogPage() {
     setSelectedTag('');
   };
 
-  // Featured post (most recent)
-  const featuredPost = posts[0];
+  const featuredPost = filteredPosts.length > 0 ? filteredPosts[0] : null;
   const regularPosts = filteredPosts.slice(1);
 
+  if (loading) {
+    return <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">Cargando...</div>;
+  }
+
+  if (error) {
+    return <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center text-red-500">{error}</div>;
+  }
+  
   return (
     <div className="pt-16 md:pt-20 min-h-screen">
       {/* Header */}
@@ -237,7 +164,7 @@ export function BlogPage() {
       </section>
 
       {/* Featured Post */}
-      {!searchTerm && !selectedCategory && !selectedTag && (
+      {!searchTerm && !selectedCategory && !selectedTag && featuredPost && (
         <section className="py-12 bg-gray-50">
           <div className="container mx-auto px-4 sm:px-6">
             <h2 className="text-2xl font-bold mb-8">Artículo destacado</h2>
@@ -245,7 +172,7 @@ export function BlogPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                 <div className="aspect-video lg:aspect-auto">
                   <img
-                    src={featuredPost.featuredImage}
+                    src={featuredPost.featured_image_url || ''}
                     alt={`Imagen del artículo: ${featuredPost.title}`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -253,7 +180,7 @@ export function BlogPage() {
                 <div className="p-8">
                   <div className="flex items-center gap-3 mb-4">
                     <span className="px-3 py-1 bg-black text-white rounded-full text-xs font-medium">
-                      {featuredPost.category}
+                      {featuredPost.category_id}
                     </span>
                     <span className="text-sm text-gray-600">Destacado</span>
                   </div>
@@ -275,18 +202,18 @@ export function BlogPage() {
                     <div className="flex items-center space-x-4 text-sm text-gray-600">
                       <div className="flex items-center">
                         <img
-                          src={featuredPost.author.avatar}
-                          alt={featuredPost.author.name}
+                          src={featuredPost.author?.avatar_url || ''}
+                          alt={featuredPost.author?.full_name || ''}
                           className="w-6 h-6 rounded-full mr-2"
                         />
-                        <span>{featuredPost.author.name}</span>
+                        <span>{featuredPost.author?.full_name}</span>
                       </div>
                       <span>•</span>
-                      <span>{formatDate(featuredPost.publishedAt)}</span>
+                      <span>{formatDate(featuredPost.published_at)}</span>
                       <span>•</span>
                       <div className="flex items-center">
                         <Clock className="w-4 h-4 mr-1" />
-                        <span>{featuredPost.readTime} min</span>
+                        <span>{featuredPost.read_time} min</span>
                       </div>
                     </div>
                     
@@ -326,7 +253,7 @@ export function BlogPage() {
                 <article key={post.id} className="card group">
                   <div className="aspect-video rounded-lg overflow-hidden mb-4">
                     <img
-                      src={post.featuredImage}
+                      src={post.featured_image_url || ''}
                       alt={`Imagen del artículo: ${post.title}`}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"
@@ -336,11 +263,11 @@ export function BlogPage() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-                        {post.category}
+                        {post.category_id}
                       </span>
                       <div className="flex items-center text-xs text-gray-500">
                         <Clock className="w-3 h-3 mr-1" />
-                        {post.readTime} min
+                        {post.read_time} min
                       </div>
                     </div>
 
@@ -358,7 +285,7 @@ export function BlogPage() {
                     </p>
 
                     <div className="flex flex-wrap gap-1">
-                      {post.tags.slice(0, 3).map((tag) => (
+                      {post.tags && post.tags.slice(0, 3).map((tag) => (
                         <button
                           key={tag}
                           onClick={() => setSelectedTag(tag)}
@@ -373,16 +300,16 @@ export function BlogPage() {
                     <div className="flex items-center justify-between pt-3 border-t">
                       <div className="flex items-center text-xs text-gray-600">
                         <img
-                          src={post.author.avatar}
-                          alt={post.author.name}
+                          src={post.author?.avatar_url || ''}
+                          alt={post.author?.full_name || ''}
                           className="w-5 h-5 rounded-full mr-2"
                         />
-                        <span className="mr-2">{post.author.name}</span>
+                        <span className="mr-2">{post.author?.full_name}</span>
                         <span>•</span>
-                        <span className="ml-2">{formatDate(post.publishedAt)}</span>
+                        <span className="ml-2">{formatDate(post.published_at)}</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {post.views} vistas
+                        {post.view_count} vistas
                       </div>
                     </div>
                   </div>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
@@ -10,13 +11,17 @@ import {
   Heart,
   MessageCircle
 } from 'lucide-react';
+import { getBlogPostBySlug, type BlogPostWithAuthor } from '../lib/firestore';
 
 export function BlogPostPage() {
-  const { slug: _ } = useParams();
+  const { slug } = useParams<{ slug: string }>();
+  const [post, setPost] = useState<BlogPostWithAuthor | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
-  // Define interface for comment type
+
   interface Comment {
     id: number;
     author: string;
@@ -27,107 +32,36 @@ export function BlogPostPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
 
-  // Simulated blog post data - in real app this would come from an API
-  const post = {
-    id: 1,
-    title: 'Reflexión semanal: La esperanza que no defrauda',
-    content: `
-      <p>En un mundo lleno de incertidumbre, donde las noticias parecen traer más preocupación que paz, encontramos en la Palabra de Dios una verdad inmutable: "Y la esperanza no defrauda, porque el amor de Dios ha sido derramado en nuestros corazones por el Espíritu Santo que nos fue dado" (Romanos 5:5).</p>
+  useEffect(() => {
+    const fetchPost = async () => {
+      if (!slug) return;
+      try {
+        setLoading(true);
+        const fetchedPost = await getBlogPostBySlug(slug);
+        if (fetchedPost) {
+          setPost(fetchedPost);
+          setLikesCount(fetchedPost.likes || 0);
+        } else {
+          setError('Artículo no encontrado');
+        }
+      } catch (err) {
+        setError('Error al cargar el artículo.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      <h2>¿Qué es la esperanza cristiana?</h2>
-      
-      <p>La esperanza cristiana no es un optimismo ciego o una ilusión pasajera. Es una confianza sólida y fundamentada en las promesas inmutables de Dios. Mientras que la esperanza del mundo está basada en circunstancias cambiantes, nuestra esperanza está anclada en el carácter eterno de nuestro Padre celestial.</p>
+    fetchPost();
+  }, [slug]);
+  
+  // Simulated related posts - this can be replaced with a real implementation later
+  const relatedPosts = [];
 
-      <blockquote>
-        <p>"Tenemos como firme y segura ancla del alma una esperanza que penetra hasta detrás del velo" - Hebreos 6:19</p>
-      </blockquote>
-
-      <h2>Características de la esperanza que no defrauda</h2>
-
-      <h3>1. Es una esperanza activa</h3>
-      <p>La verdadera esperanza cristiana no nos lleva a la pasividad, sino a la acción. Nos impulsa a seguir adelante, a perseverar en medio de las dificultades y a trabajar por un futuro mejor, sabiendo que Dios está obrando en todas las cosas para bien.</p>
-
-      <h3>2. Está centrada en Cristo</h3>
-      <p>Nuestra esperanza no está puesta en sistemas políticos, en la economía mundial o en nuestras propias fuerzas. Está puesta en Cristo Jesús, quien venció la muerte y nos prometió vida eterna. "Cristo en vosotros, la esperanza de gloria" (Colosenses 1:27).</p>
-
-      <h3>3. Transforma el presente</h3>
-      <p>La esperanza eterna no es solo sobre el futuro; transforma cómo vivimos hoy. Nos da perspectiva en los problemas, fortaleza en la debilidad y propósito en medio de la adversidad.</p>
-
-      <h2>Cultivando la esperanza en nuestro diario vivir</h2>
-
-      <p>¿Cómo podemos mantener viva esta esperanza en nuestros corazones? Te sugiero tres prácticas esenciales:</p>
-
-      <ul>
-        <li><strong>Medita en las promesas de Dios:</strong> Dedica tiempo diario a leer y reflexionar en las Escrituras. Cada promesa de Dios es un recordatorio de su fidelidad.</li>
-        <li><strong>Ora sin cesar:</strong> La oración nos conecta con la fuente de toda esperanza. En la presencia de Dios encontramos renovación y fortaleza.</li>
-        <li><strong>Comparte tu esperanza:</strong> Cuando compartimos nuestra esperanza con otros, no solo los bendecimos a ellos, sino que también fortalecemos nuestra propia fe.</li>
-      </ul>
-
-      <h2>Un mensaje personal</h2>
-
-      <p>Querido hermano o hermana en la fe, si hoy te encuentras atravesando una temporada difícil, quiero recordarte que tu esperanza no está puesta en algo incierto, sino en Alguien que es completamente fiel. Dios no ha cambiado, sus promesas siguen siendo verdad, y su amor por ti es inquebrantable.</p>
-
-      <p>La esperanza cristiana no nos garantiza que la vida será fácil, pero sí nos asegura que nunca caminaremos solos. En cada valle, Dios está con nosotros. En cada montaña, Él nos sostiene. Y al final del camino, nos espera una gloria eterna que hará que todas nuestras luchas presentes palidezcan en comparación.</p>
-
-      <h2>Para reflexionar</h2>
-
-      <p>Te invito a reflexionar en estas preguntas durante la semana:</p>
-      
-      <ol>
-        <li>¿En qué o en quién está puesta mi esperanza?</li>
-        <li>¿Cómo puedo ser un portador de esperanza para otros en mi comunidad?</li>
-        <li>¿Qué promesas específicas de Dios necesito recordar en este momento de mi vida?</li>
-      </ol>
-
-      <p>Recuerda: la esperanza cristiana no defrauda porque está fundamentada en el amor incondicional de Dios y en las promesas cumplidas en Cristo Jesús. Esta esperanza es tu derecho como hijo de Dios, tu ancla en la tormenta y tu luz en la oscuridad.</p>
-
-      <p><em>Que la paz de Dios, que sobrepasa todo entendimiento, guarde vuestros corazones y vuestros pensamientos en Cristo Jesús.</em></p>
-    `,
-    excerpt: 'En tiempos de incertidumbre, la esperanza cristiana se convierte en nuestro ancla. Descubre cómo cultivar una esperanza que trasciende las circunstancias.',
-    author: {
-      name: 'Pastor Reynel Dueñas',
-      avatar: '/Pastor Reynel Dueñas P n g.png',
-      bio: 'Pastor principal de Iglesia Vida Nueva con una pasión profunda por la Palabra de Dios y el cuidado pastoral de la congregación.'
-    },
-    category: 'Fe',
-    tags: ['esperanza', 'vida cristiana', 'reflexión', 'promesas de Dios'],
-    publishedAt: '2025-01-25',
-    readTime: 5,
-    featuredImage: 'https://images.pexels.com/photos/289586/pexels-photo-289586.jpeg?auto=compress&cs=tinysrgb&w=1200&h=600&fit=crop',
-    views: 234,
-    likes: 18,
-    comments: 7
-  };
-
-  const relatedPosts = [
-    {
-      id: 2,
-      slug: 'voluntariado-como-ayudar',
-      title: 'Cómo ser voluntario en la iglesia',
-      featuredImage: 'https://images.pexels.com/photos/6994925/pexels-photo-6994925.jpeg?auto=compress&cs=tinysrgb&w=400&h=200&fit=crop',
-      publishedAt: '2025-01-22',
-      readTime: 7
-    },
-    {
-      id: 4,
-      slug: 'oracion-efectiva',
-      title: 'Los elementos de una oración efectiva',
-      featuredImage: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=400&h=200&fit=crop',
-      publishedAt: '2025-01-18',
-      readTime: 6
-    },
-    {
-      id: 3,
-      slug: 'fortaleciendo-matrimonio',
-      title: 'Fortaleciendo el matrimonio con principios bíblicos',
-      featuredImage: 'https://images.pexels.com/photos/1024993/pexels-photo-1024993.jpeg?auto=compress&cs=tinysrgb&w=400&h=200&fit=crop',
-      publishedAt: '2025-01-20',
-      readTime: 8
-    }
-  ];
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    const dateObject = date.toDate ? date.toDate() : new Date(date);
+    return dateObject.toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -135,7 +69,7 @@ export function BlogPostPage() {
   };
 
   const sharePost = async () => {
-    if (navigator.share) {
+    if (post && navigator.share) {
       await navigator.share({
         title: post.title,
         text: 'Te recomiendo leer este artículo: ' + post.title,
@@ -146,40 +80,31 @@ export function BlogPostPage() {
       alert('Enlace copiado al portapapeles. ¡Compártelo con tus amigos!');
     }
   };
-  
-  // Initialize likes count from post data
-  useEffect(() => {
-    setLikesCount(post.likes);
-    
-    // Initialize comments with dummy data
-    setComments([
-      { id: 1, author: 'María García', content: 'Excelente reflexión, justo lo que necesitaba leer hoy.', date: '2023-05-15T14:30:00' },
-      { id: 2, author: 'Juan Pérez', content: 'Me encantó la parte sobre la esperanza activa. Muy inspirador.', date: '2023-05-15T16:45:00' },
-      { id: 3, author: 'Ana Rodríguez', content: 'Gracias por compartir estas palabras de aliento.', date: '2023-05-16T09:20:00' },
-    ]);
-  }, [post.likes]);
-  
-  // Function to add a new comment
+
   const addComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (newComment.trim() === '') return;
     
     const newCommentObj = {
       id: comments.length + 1,
-      author: 'Usuario',
+      author: 'Usuario', // This should be replaced with the logged in user
       content: newComment,
       date: new Date().toISOString()
     };
     
     setComments([...comments, newCommentObj]);
-     setNewComment('');
+    setNewComment('');
   };
 
-  if (!post) {
+  if (loading) {
+    return <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">Cargando...</div>;
+  }
+
+  if (error || !post) {
     return (
       <div className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Artículo no encontrado</h1>
+          <h1 className="text-2xl font-bold mb-4">{error || 'Artículo no encontrado'}</h1>
           <Link to="/blog" className="btn-primary">
             Ver todos los artículos
           </Link>
@@ -234,7 +159,7 @@ export function BlogPostPage() {
 
               <div className="mb-4">
                 <span className="px-3 py-1 bg-black text-white rounded-full text-sm font-medium">
-                  {post.category}
+                  {post.category_id}
                 </span>
               </div>
 
@@ -243,37 +168,39 @@ export function BlogPostPage() {
               </h1>
 
               <div className="flex flex-wrap items-center gap-6 text-gray-600 mb-6">
-                <div className="flex items-center">
-                  <img
-                    src={post.author.avatar}
-                    alt={post.author.name}
-                    className="w-10 h-10 rounded-full mr-3"
-                  />
-                  <div>
-                    <div className="font-medium text-black">{post.author.name}</div>
-                    <div className="text-sm">Pastor Principal</div>
-                  </div>
-                </div>
+                {post.author && (
+                    <div className="flex items-center">
+                    <img
+                        src={post.author.avatar_url || ''}
+                        alt={post.author.full_name || ''}
+                        className="w-10 h-10 rounded-full mr-3"
+                    />
+                    <div>
+                        <div className="font-medium text-black">{post.author.full_name}</div>
+                        <div className="text-sm">{post.author.website}</div>
+                    </div>
+                    </div>
+                )}
                 
                 <div className="flex items-center">
                   <Calendar className="w-5 h-5 mr-2" />
-                  <span>{formatDate(post.publishedAt)}</span>
+                  <span>{formatDate(post.published_at)}</span>
                 </div>
                 
                 <div className="flex items-center">
                   <Clock className="w-5 h-5 mr-2" />
-                  <span>{post.readTime} min de lectura</span>
+                  <span>{post.read_time} min de lectura</span>
                 </div>
                 
                 <div className="flex items-center">
                   <Eye className="w-5 h-5 mr-2" />
-                  <span>{post.views} vistas</span>
+                  <span>{post.view_count} vistas</span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="flex flex-wrap gap-2">
-                  {post.tags.map((tag) => (
+                  {post.tags && post.tags.map((tag) => (
                     <span
                       key={tag}
                       className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
@@ -316,7 +243,7 @@ export function BlogPostPage() {
             {/* Featured Image */}
             <div className="aspect-video rounded-lg overflow-hidden mb-8">
               <img
-                src={post.featuredImage}
+                src={post.featured_image_url || ''}
                 alt={`Imagen del artículo: ${post.title}`}
                 className="w-full h-full object-cover"
               />
@@ -325,24 +252,26 @@ export function BlogPostPage() {
             {/* Content */}
             <div 
               className="prose prose-lg prose-gray max-w-none mb-12"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              dangerouslySetInnerHTML={{ __html: post.content || '' }}
             />
 
             {/* Author Bio */}
-            <div className="bg-gray-50 rounded-lg p-6 mb-12">
-              <h3 className="text-xl font-semibold mb-4">Sobre el autor</h3>
-              <div className="flex items-start">
-                <img
-                  src={post.author.avatar}
-                  alt={post.author.name}
-                  className="w-16 h-16 rounded-full mr-4"
-                />
-                <div>
-                  <h4 className="text-lg font-semibold mb-2">{post.author.name}</h4>
-                  <p className="text-gray-700 leading-relaxed">{post.author.bio}</p>
+            {post.author && (
+                <div className="bg-gray-50 rounded-lg p-6 mb-12">
+                    <h3 className="text-xl font-semibold mb-4">Sobre el autor</h3>
+                    <div className="flex items-start">
+                        <img
+                        src={post.author.avatar_url || ''}
+                        alt={post.author.full_name || ''}
+                        className="w-16 h-16 rounded-full mr-4"
+                        />
+                        <div>
+                        <h4 className="text-lg font-semibold mb-2">{post.author.full_name}</h4>
+                        <p className="text-gray-700 leading-relaxed">{post.author.website}</p>
+                        </div>
+                    </div>
                 </div>
-              </div>
-            </div>
+            )}
 
             {/* Share Section */}
             <div className="text-center py-8 border-t border-b">
@@ -350,7 +279,7 @@ export function BlogPostPage() {
               <div className="flex justify-center space-x-4">
                 <button className="btn-secondary flex items-center">
                   <Heart className="w-4 h-4 mr-2" />
-                  Me gusta ({post.likes})
+                  Me gusta ({likesCount})
                 </button>
                 <button
                   onClick={sharePost}
@@ -367,7 +296,7 @@ export function BlogPostPage() {
           <section className="mt-12">
             <h2 className="text-2xl font-bold mb-8">Artículos relacionados</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {relatedPosts.map((relatedPost) => (
+              {relatedPosts.map((relatedPost: any) => (
                 <article key={relatedPost.id} className="card group">
                   <div className="aspect-video rounded-lg overflow-hidden mb-4">
                     <img

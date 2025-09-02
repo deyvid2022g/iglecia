@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js'
 
 // Estas variables deben ser configuradas en tu archivo .env
@@ -394,13 +395,22 @@ export interface Profile {
   updated_at: string
 }
 
+export interface Location {
+    id: string;
+    name: string;
+    address: string;
+    full_address: string;
+    latitude: number;
+    longitude: number;
+}
+
 export interface Event {
   id: string
   slug: string
   title: string
   description: string
   detailed_description?: string
-  event_date: string
+  event_date: any
   start_time: string
   end_time: string
   type: string
@@ -421,6 +431,11 @@ export interface Event {
   created_at: string
   updated_at: string
 }
+
+export interface EventWithLocation extends Event {
+    location: Location | null;
+}
+
 
 export interface Sermon {
   id: string
@@ -457,7 +472,7 @@ export interface BlogPost {
   author_id?: string
   category_id?: string
   tags?: string[]
-  published_at?: string
+  published_at?: any
   read_time?: number
   view_count: number
   like_count: number
@@ -603,7 +618,7 @@ export const getCurrentProfile = async (): Promise<Profile | null> => {
     // Mapear los datos de la base de datos al tipo Profile
     return {
       id: data.id,
-      name: data.full_name, // Mapear full_name a name
+      full_name: data.full_name, // Mapear full_name a name
       email: data.email,
       phone: data.phone,
       avatar_url: data.avatar_url,
