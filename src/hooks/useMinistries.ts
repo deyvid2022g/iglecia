@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, type Ministry } from '../lib/supabase'
+import { type Ministry } from '../lib/supabase'
 import { useAuth } from './useAuth'
 
 export interface MinistriesState {
@@ -19,6 +19,76 @@ export interface MinistriesActions {
   refreshMinistries: () => Promise<void>
 }
 
+// Datos mock para ministerios
+const getDefaultMinistries = (): Ministry[] => [
+  {
+    id: '1',
+    slug: 'alabanza-y-adoracion',
+    name: 'Alabanza y Adoración',
+    description: 'Ministerio dedicado a dirigir la adoración en los servicios y eventos especiales',
+    mission: 'Guiar a la congregación en adoración genuina a Dios',
+    vision: 'Ser un ministerio que inspire corazones a adorar en espíritu y verdad',
+    leader_id: 'user1',
+    target_age_group: 'all',
+    meeting_schedule: 'Domingos 8:00 AM - Ensayo, Domingos 10:00 AM - Servicio',
+    location: 'Santuario Principal',
+    contact_email: 'alabanza@iglesia.com',
+    contact_phone: '+1234567890',
+    requirements: ['Conocimiento básico de música', 'Compromiso con los ensayos', 'Corazón de adoración'],
+    benefits: ['Crecimiento musical', 'Liderazgo en adoración', 'Comunidad musical'],
+    is_active: true,
+    is_recruiting: true,
+    max_members: 15,
+    current_members: 8,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  {
+    id: '2',
+    slug: 'jovenes',
+    name: 'Ministerio de Jóvenes',
+    description: 'Ministerio enfocado en el crecimiento espiritual y desarrollo de los jóvenes',
+    mission: 'Formar jóvenes comprometidos con Cristo y su propósito',
+    vision: 'Jóvenes que transformen su generación para Cristo',
+    leader_id: 'user2',
+    target_age_group: 'youth',
+    meeting_schedule: 'Viernes 7:00 PM',
+    location: 'Salón de Jóvenes',
+    contact_email: 'jovenes@iglesia.com',
+    contact_phone: '+1234567891',
+    requirements: ['Edad entre 13-25 años', 'Deseo de crecer espiritualmente'],
+    benefits: ['Amistad cristiana', 'Actividades recreativas', 'Formación bíblica'],
+    is_active: true,
+    is_recruiting: true,
+    max_members: 50,
+    current_members: 32,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  {
+    id: '3',
+    slug: 'ninos',
+    name: 'Ministerio Infantil',
+    description: 'Ministerio dedicado a la enseñanza y cuidado de los niños',
+    mission: 'Enseñar a los niños el amor de Jesús de manera creativa y divertida',
+    vision: 'Niños que conozcan y amen a Jesús desde temprana edad',
+    leader_id: 'user3',
+    target_age_group: 'children',
+    meeting_schedule: 'Domingos 10:00 AM',
+    location: 'Salón Infantil',
+    contact_email: 'ninos@iglesia.com',
+    contact_phone: '+1234567892',
+    requirements: ['Amor por los niños', 'Paciencia', 'Creatividad'],
+    benefits: ['Impacto en vidas jóvenes', 'Desarrollo de habilidades pedagógicas'],
+    is_active: true,
+    is_recruiting: true,
+    max_members: 20,
+    current_members: 12,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  }
+]
+
 export const useMinistries = (options?: {
   active?: boolean
   targetAgeGroup?: string
@@ -34,39 +104,38 @@ export const useMinistries = (options?: {
       setLoading(true)
       setError(null)
 
-      let query = supabase
-        .from('ministries')
-        .select(`
-          *,
-          profiles!ministries_leader_id_fkey(
-            name,
-            avatar_url,
-            email
-          )
-        `)
-        .order('display_order', { ascending: true })
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 400))
+
+      // Obtener ministerios del localStorage o usar datos por defecto
+      const storedMinistries = localStorage.getItem('ministries')
+      let existingMinistries: Ministry[] = storedMinistries ? JSON.parse(storedMinistries) : getDefaultMinistries()
+
+      // Guardar en localStorage si no existían
+      if (!storedMinistries) {
+        localStorage.setItem('ministries', JSON.stringify(existingMinistries))
+      }
 
       // Aplicar filtros
       if (options?.active !== undefined) {
-        query = query.eq('is_active', options.active)
+        existingMinistries = existingMinistries.filter(ministry => ministry.is_active === options.active)
       }
 
       if (options?.targetAgeGroup) {
-        query = query.eq('target_age_group', options.targetAgeGroup)
+        existingMinistries = existingMinistries.filter(ministry => 
+          ministry.target_age_group === options.targetAgeGroup || ministry.target_age_group === 'all'
+        )
       }
 
+      // Ordenar por nombre
+      existingMinistries.sort((a, b) => a.name.localeCompare(b.name))
+
+      // Aplicar límite
       if (options?.limit) {
-        query = query.limit(options.limit)
+        existingMinistries = existingMinistries.slice(0, options.limit)
       }
 
-      const { data, error } = await query
-
-      if (error) {
-        setError(error.message)
-        console.error('Error fetching ministries:', error)
-      } else {
-        setMinistries(data || [])
-      }
+      setMinistries(existingMinistries)
     } catch (err) {
       setError('Error al cargar ministerios')
       console.error('Error in fetchMinistries:', err)
@@ -81,154 +150,206 @@ export const useMinistries = (options?: {
 
   const createMinistry = async (ministryData: Omit<Ministry, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const { data, error } = await supabase
-        .from('ministries')
-        .insert(ministryData)
-        .select()
-        .single()
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 500))
 
-      if (!error && data) {
-        setMinistries(prev => [...prev, data].sort((a, b) => a.display_order - b.display_order))
+      // Obtener ministerios del localStorage
+      const storedMinistries = localStorage.getItem('ministries')
+      const existingMinistries: Ministry[] = storedMinistries ? JSON.parse(storedMinistries) : getDefaultMinistries()
+
+      // Crear nuevo ministerio con datos mock
+      const newMinistry: Ministry = {
+        ...ministryData,
+        id: `ministry_${Date.now()}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
 
-      return { data, error }
+      // Agregar a la lista
+      const updatedMinistries = [...existingMinistries, newMinistry]
+      localStorage.setItem('ministries', JSON.stringify(updatedMinistries))
+
+      // Actualizar estado local
+      setMinistries(prev => [...prev, newMinistry])
+
+      return { data: newMinistry, error: null }
     } catch (err) {
       console.error('Error creating ministry:', err)
-      return { data: null, error: err }
+      return { data: null, error: err as Error }
     }
   }
 
   const updateMinistry = async (id: string, updates: Partial<Ministry>) => {
     try {
-      const { data, error } = await supabase
-        .from('ministries')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 500))
 
-      if (!error && data) {
-        setMinistries(prev => prev.map(ministry => ministry.id === id ? data : ministry))
+      // Obtener ministerios del localStorage
+      const storedMinistries = localStorage.getItem('ministries')
+      const existingMinistries: Ministry[] = storedMinistries ? JSON.parse(storedMinistries) : getDefaultMinistries()
+
+      // Encontrar y actualizar el ministerio
+      const ministryIndex = existingMinistries.findIndex(ministry => ministry.id === id)
+      if (ministryIndex === -1) {
+        throw new Error('Ministerio no encontrado')
       }
 
-      return { data, error }
+      const updatedMinistry = {
+        ...existingMinistries[ministryIndex],
+        ...updates,
+        updated_at: new Date().toISOString()
+      }
+
+      existingMinistries[ministryIndex] = updatedMinistry
+      localStorage.setItem('ministries', JSON.stringify(existingMinistries))
+
+      // Actualizar estado local
+      setMinistries(prev => prev.map(ministry => ministry.id === id ? updatedMinistry : ministry))
+
+      return { data: updatedMinistry, error: null }
     } catch (err) {
       console.error('Error updating ministry:', err)
-      return { data: null, error: err }
+      return { data: null, error: err as Error }
     }
   }
 
   const deleteMinistry = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('ministries')
-        .delete()
-        .eq('id', id)
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 500))
 
-      if (!error) {
-        setMinistries(prev => prev.filter(ministry => ministry.id !== id))
-      }
+      // Obtener ministerios del localStorage
+      const storedMinistries = localStorage.getItem('ministries')
+      const existingMinistries: Ministry[] = storedMinistries ? JSON.parse(storedMinistries) : getDefaultMinistries()
 
-      return { error }
+      // Filtrar para remover el ministerio
+      const updatedMinistries = existingMinistries.filter(ministry => ministry.id !== id)
+      localStorage.setItem('ministries', JSON.stringify(updatedMinistries))
+
+      // Actualizar estado local
+      setMinistries(prev => prev.filter(ministry => ministry.id !== id))
+
+      return { error: null }
     } catch (err) {
       console.error('Error deleting ministry:', err)
-      return { error: err }
+      return { error: err as Error }
     }
   }
 
   const getMinistryBySlug = async (slug: string) => {
     try {
-      const { data, error } = await supabase
-        .from('ministries')
-        .select(`
-          *,
-          profiles!ministries_leader_id_fkey(
-            name,
-            avatar_url,
-            email,
-            bio
-          ),
-          ministry_activities(
-            id,
-            title,
-            description,
-            schedule,
-            location,
-            icon,
-            is_active
-          )
-        `)
-        .eq('slug', slug)
-        .single()
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 300))
 
-      return { data, error }
+      // Obtener ministerios del localStorage
+      const storedMinistries = localStorage.getItem('ministries')
+      const existingMinistries: Ministry[] = storedMinistries ? JSON.parse(storedMinistries) : getDefaultMinistries()
+
+      // Buscar el ministerio por slug
+      const foundMinistry = existingMinistries.find(ministry => ministry.slug === slug)
+
+      if (!foundMinistry) {
+        return { data: null, error: new Error('Ministerio no encontrado') }
+      }
+
+      return { data: foundMinistry, error: null }
     } catch (err) {
       console.error('Error getting ministry by slug:', err)
-      return { data: null, error: err }
+      return { data: null, error: err as Error }
     }
   }
 
   const joinMinistry = async (ministryId: string, role: string = 'member') => {
     try {
       if (!user) {
-        return { error: { message: 'Debes iniciar sesión para unirte a un ministerio' } }
+        return { error: { message: 'Debes iniciar sesión para unirte a un ministerio' } as Error }
       }
 
-      const { error } = await supabase
-        .from('ministry_members')
-        .insert({
-          ministry_id: ministryId,
-          user_id: user.id,
-          role,
-          is_active: true
-        })
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 400))
 
-      return { error }
+      // Obtener miembros del localStorage
+      const storedMembers = localStorage.getItem('ministry_members')
+      const existingMembers: { ministryId: string; userId: string; role: string; isActive: boolean }[] = 
+        storedMembers ? JSON.parse(storedMembers) : []
+
+      // Verificar si ya es miembro
+      const existingMember = existingMembers.find(member => 
+        member.ministryId === ministryId && member.userId === user.id
+      )
+
+      if (existingMember) {
+        return { error: { message: 'Ya eres miembro de este ministerio' } as Error }
+      }
+
+      // Agregar nuevo miembro
+      existingMembers.push({
+        ministryId,
+        userId: user.id,
+        role,
+        isActive: true
+      })
+
+      localStorage.setItem('ministry_members', JSON.stringify(existingMembers))
+
+      return { error: null }
     } catch (err) {
       console.error('Error joining ministry:', err)
-      return { error: err }
+      return { error: err as Error }
     }
   }
 
   const leaveMinistry = async (ministryId: string) => {
     try {
       if (!user) {
-        return { error: { message: 'Debes iniciar sesión' } }
+        return { error: { message: 'Debes iniciar sesión' } as Error }
       }
 
-      const { error } = await supabase
-        .from('ministry_members')
-        .update({ is_active: false })
-        .eq('ministry_id', ministryId)
-        .eq('user_id', user.id)
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 400))
 
-      return { error }
+      // Obtener miembros del localStorage
+      const storedMembers = localStorage.getItem('ministry_members')
+      const existingMembers: { ministryId: string; userId: string; role: string; isActive: boolean }[] = 
+        storedMembers ? JSON.parse(storedMembers) : []
+
+      // Filtrar para remover al usuario del ministerio
+      const updatedMembers = existingMembers.filter(member => 
+        !(member.ministryId === ministryId && member.userId === user.id)
+      )
+
+      localStorage.setItem('ministry_members', JSON.stringify(updatedMembers))
+
+      return { error: null }
     } catch (err) {
       console.error('Error leaving ministry:', err)
-      return { error: err }
+      return { error: err as Error }
     }
   }
 
   const getMinistryMembers = async (ministryId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('ministry_members')
-        .select(`
-          *,
-          profiles(
-            name,
-            avatar_url,
-            email
-          )
-        `)
-        .eq('ministry_id', ministryId)
-        .eq('is_active', true)
-        .order('joined_at', { ascending: false })
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 300))
 
-      return { data, error }
+      // Obtener miembros del localStorage
+      const storedMembers = localStorage.getItem('ministry_members')
+      const existingMembers: { ministryId: string; userId: string; role: string; isActive: boolean }[] = 
+        storedMembers ? JSON.parse(storedMembers) : []
+
+      // Filtrar miembros del ministerio específico
+      const ministryMembers = existingMembers
+        .filter(member => member.ministryId === ministryId && member.isActive)
+        .map(member => ({
+          id: member.userId,
+          name: `Usuario ${member.userId}`,
+          role: member.role
+        }))
+
+      return { data: ministryMembers, error: null }
     } catch (err) {
       console.error('Error getting ministry members:', err)
-      return { data: null, error: err }
+      return { data: null, error: err as Error }
     }
   }
 
@@ -265,33 +386,20 @@ export const useMinistry = (slug: string) => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('ministries')
-          .select(`
-            *,
-            profiles!ministries_leader_id_fkey(
-              name,
-              avatar_url,
-              email,
-              bio
-            ),
-            ministry_activities(
-              id,
-              title,
-              description,
-              schedule,
-              location,
-              icon,
-              is_active
-            )
-          `)
-          .eq('slug', slug)
-          .single()
+        // Simular delay de red
+        await new Promise(resolve => setTimeout(resolve, 300))
 
-        if (error) {
-          setError(error.message)
+        // Obtener ministerios del localStorage
+        const storedMinistries = localStorage.getItem('ministries')
+        const ministries: Ministry[] = storedMinistries ? JSON.parse(storedMinistries) : getDefaultMinistries()
+
+        // Buscar ministerio por slug
+        const foundMinistry = ministries.find(m => m.slug === slug)
+
+        if (!foundMinistry) {
+          setError('Ministerio no encontrado')
         } else {
-          setMinistry(data)
+          setMinistry(foundMinistry)
         }
       } catch (err) {
         setError('Error al cargar ministerio')
@@ -334,38 +442,23 @@ export const usePublicChurchSettings = () => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('church_settings')
-          .select('*')
-          .eq('is_public', true)
+        // Simular delay de red
+        await new Promise(resolve => setTimeout(resolve, 200))
 
-        if (error) {
-          setError(error.message)
-        } else {
-          const settingsObj = (data || []).reduce((acc, setting) => {
-            let value = setting.value
-            
-            if (setting.type === 'number') {
-              value = parseFloat(value)
-            } else if (setting.type === 'boolean') {
-              value = value === 'true'
-            } else if (setting.type === 'json') {
-              try {
-                value = JSON.parse(value)
-              } catch {
-                value = setting.value
-              }
-            }
-            
-            acc[setting.key] = value
-            return acc
-          }, {} as Record<string, unknown>)
-          
-          setSettings(settingsObj)
+        // Configuraciones públicas simuladas
+        const mockSettings = {
+          church_name: 'Iglesia Cristiana Central',
+          church_address: 'Calle Principal 123, Ciudad',
+          church_phone: '+1234567890',
+          church_email: 'info@iglesia.com',
+          service_times: 'Domingos 10:00 AM y 6:00 PM',
+          welcome_message: 'Bienvenidos a nuestra iglesia'
         }
+
+        setSettings(mockSettings)
       } catch (err) {
         setError('Error al cargar configuraciones')
-        console.error('Error fetching church settings:', err)
+        console.error('Error fetching settings:', err)
       } finally {
         setLoading(false)
       }

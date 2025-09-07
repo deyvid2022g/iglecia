@@ -126,21 +126,32 @@ export function HomePage() {
         aria-labelledby="hero-title"
       >
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white"></div>
+        <div 
+          className="absolute inset-0 opacity-90"
+          style={{
+            backgroundImage: 'url(/Predi.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        ></div>
         <div className="relative container mx-auto px-4 sm:px-6">
           <div className="max-w-4xl mx-auto text-center">
             <HeroLogo className="mb-6" />
             <h1 
               id="hero-title"
-              className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-6 transition-all duration-700 ${
+              className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-6 transition-all duration-700 text-white ${
                 isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
               }`}
+              style={{ textShadow: '0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 0, 0, 0.4)' }}
             >
               Lugar de Refugio
             </h1>
             <p 
-              className={`text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed transition-all duration-700 delay-200 ${
+              className={`text-xl md:text-2xl text-white mb-8 max-w-3xl mx-auto leading-relaxed transition-all duration-700 delay-200 ${
                 isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
               }`}
+              style={{ textShadow: '0 0 8px rgba(0, 0, 0, 0.8), 0 0 16px rgba(0, 0, 0, 0.6)' }}
             >
               Impactando y transformando las generaciones por medio de los principios bíblicos. Un lugar donde acogemos a cada persona generando espacios de adoración y comunión.
             </p>

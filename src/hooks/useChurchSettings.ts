@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, type ChurchSetting, type ServiceSchedule, type OfficeHours, type SpecialDate, type ChurchFacility, type FacilityBooking } from '../lib/supabase';
+import { type ChurchSetting, type ServiceSchedule, type OfficeHours, type SpecialDate, type ChurchFacility, type FacilityBooking } from '../lib/supabase';
 
 // Definición del tipo SystemNotification
 type SystemNotification = {
@@ -15,6 +15,70 @@ type SystemNotification = {
   is_active: boolean;
 };
 
+// Datos mock para configuraciones de la iglesia
+const getDefaultChurchSettings = (): ChurchSetting[] => [
+  {
+    id: '1',
+    setting_key: 'church_name',
+    setting_value: 'Iglesia Cristiana Central',
+    setting_type: 'text',
+    category: 'general',
+    description: 'Nombre oficial de la iglesia',
+    is_public: true,
+    display_order: 1,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  {
+    id: '2',
+    setting_key: 'church_tagline',
+    setting_value: 'Una iglesia para toda la familia',
+    setting_type: 'text',
+    category: 'general',
+    description: 'Lema o eslogan de la iglesia',
+    is_public: true,
+    display_order: 2,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  {
+    id: '3',
+    setting_key: 'church_address',
+    setting_value: 'Calle Principal 123, Ciudad',
+    setting_type: 'text',
+    category: 'contact',
+    description: 'Dirección física de la iglesia',
+    is_public: true,
+    display_order: 3,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  {
+    id: '4',
+    setting_key: 'church_phone',
+    setting_value: '+1234567890',
+    setting_type: 'text',
+    category: 'contact',
+    description: 'Teléfono principal de la iglesia',
+    is_public: true,
+    display_order: 4,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  {
+    id: '5',
+    setting_key: 'church_email',
+    setting_value: 'info@iglesia.com',
+    setting_type: 'text',
+    category: 'contact',
+    description: 'Email principal de la iglesia',
+    is_public: true,
+    display_order: 5,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  }
+];
+
 // Hook principal para configuraciones de la iglesia
 export function useChurchSettings() {
   const [settings, setSettings] = useState<ChurchSetting[]>([]);
@@ -24,13 +88,18 @@ export function useChurchSettings() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('church_settings')
-        .select('*')
-        .order('display_order');
-
-      if (error) throw error;
-      setSettings(data || []);
+      
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Obtener configuraciones del localStorage
+      const storedSettings = localStorage.getItem('church_settings');
+      const churchSettings: ChurchSetting[] = storedSettings ? JSON.parse(storedSettings) : getDefaultChurchSettings();
+      
+      // Ordenar por display_order
+      const sortedSettings = churchSettings.sort((a, b) => a.display_order - b.display_order);
+      
+      setSettings(sortedSettings);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Error al cargar configuraciones');
     } finally {
@@ -40,12 +109,24 @@ export function useChurchSettings() {
 
   const updateSetting = async (key: string, value: string) => {
     try {
-      const { error } = await supabase
-        .from('church_settings')
-        .update({ setting_value: value })
-        .eq('setting_key', key);
-
-      if (error) throw error;
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Obtener configuraciones actuales del localStorage
+      const storedSettings = localStorage.getItem('church_settings');
+      const churchSettings: ChurchSetting[] = storedSettings ? JSON.parse(storedSettings) : getDefaultChurchSettings();
+      
+      // Actualizar la configuración específica
+      const updatedSettings = churchSettings.map(setting => 
+        setting.setting_key === key 
+          ? { ...setting, setting_value: value, updated_at: new Date().toISOString() }
+          : setting
+      );
+      
+      // Guardar en localStorage
+      localStorage.setItem('church_settings', JSON.stringify(updatedSettings));
+      
+      // Actualizar estado local
       await fetchSettings();
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Error al actualizar configuración');
@@ -81,6 +162,49 @@ export function useChurchSettings() {
   };
 }
 
+// Datos mock para horarios de servicios
+const getDefaultServiceSchedules = (): ServiceSchedule[] => [
+  {
+    id: '1',
+    service_name: 'Servicio Dominical Matutino',
+    service_type: 'worship',
+    day_of_week: 0, // Domingo
+    start_time: '10:00',
+    end_time: '12:00',
+    location: 'Santuario Principal',
+    description: 'Servicio principal de adoración dominical',
+    is_active: true,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  {
+    id: '2',
+    service_name: 'Servicio Dominical Vespertino',
+    service_type: 'worship',
+    day_of_week: 0, // Domingo
+    start_time: '18:00',
+    end_time: '20:00',
+    location: 'Santuario Principal',
+    description: 'Servicio de adoración vespertino',
+    is_active: true,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  {
+    id: '3',
+    service_name: 'Reunión de Oración',
+    service_type: 'prayer',
+    day_of_week: 3, // Miércoles
+    start_time: '19:00',
+    end_time: '21:00',
+    location: 'Salón de Oración',
+    description: 'Reunión semanal de oración',
+    is_active: true,
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  }
+];
+
 // Hook para horarios de servicios
 export function useServiceSchedules() {
   const [schedules, setSchedules] = useState<ServiceSchedule[]>([]);
@@ -90,15 +214,25 @@ export function useServiceSchedules() {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('service_schedules')
-        .select('*')
-        .eq('is_active', true)
-        .order('day_of_week')
-        .order('start_time');
-
-      if (error) throw error;
-      setSchedules(data || []);
+      
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 250));
+      
+      // Obtener horarios del localStorage
+      const storedSchedules = localStorage.getItem('service_schedules');
+      const serviceSchedules: ServiceSchedule[] = storedSchedules ? JSON.parse(storedSchedules) : getDefaultServiceSchedules();
+      
+      // Filtrar solo los activos y ordenar
+      const activeSchedules = serviceSchedules
+        .filter(schedule => schedule.is_active)
+        .sort((a, b) => {
+          if (a.day_of_week !== b.day_of_week) {
+            return a.day_of_week - b.day_of_week;
+          }
+          return a.start_time.localeCompare(b.start_time);
+        });
+      
+      setSchedules(activeSchedules);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Error al cargar horarios');
     } finally {

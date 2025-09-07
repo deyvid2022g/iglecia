@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
 // TODO: Generate database types using Supabase CLI
 // For now using a placeholder type definition
 type Database = {
@@ -51,13 +50,36 @@ export function useContactMessages() {
   const fetchMessages = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('contact_messages')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setMessages(data || []);
+      // Usar mensajes simulados localmente
+      const mockMessages: ContactMessage[] = [
+        {
+          id: '1',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          name: 'María González',
+          email: 'maria@example.com',
+          phone: '+1234567890',
+          subject: 'Consulta sobre servicios',
+          message: 'Me gustaría obtener más información sobre los horarios de culto.',
+          status: 'pending',
+          source: 'website'
+        },
+        {
+          id: '2',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          name: 'Juan Pérez',
+          email: 'juan@example.com',
+          subject: 'Oración',
+          message: 'Solicito oración por mi familia.',
+          status: 'responded',
+          source: 'website',
+          responded_by: 'Pastor',
+          responded_at: new Date().toISOString(),
+          response: 'Estaremos orando por tu familia.'
+        }
+      ];
+      setMessages(mockMessages);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar mensajes');
     } finally {
@@ -67,15 +89,16 @@ export function useContactMessages() {
 
   const createMessage = async (message: Omit<ContactMessage, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const { data, error } = await supabase
-        .from('contact_messages')
-        .insert([message])
-        .select()
-        .single();
-
-      if (error) throw error;
-      await fetchMessages();
-      return data;
+      // Simular creación de mensaje localmente
+      const newMessage: ContactMessage = {
+        ...message,
+        id: Date.now().toString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      setMessages(prev => [newMessage, ...prev]);
+      return newMessage;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al enviar mensaje');
       throw err;
@@ -84,20 +107,24 @@ export function useContactMessages() {
 
   const updateMessageStatus = async (id: string, status: string, respondedBy?: string, response?: string) => {
     try {
-      const updates: Record<string, unknown> = { status };
-      if (status === 'responded' && respondedBy && response) {
-        updates.responded_by = respondedBy;
-        updates.responded_at = new Date().toISOString();
-        updates.response = response;
-      }
-
-      const { error } = await supabase
-        .from('contact_messages')
-        .update(updates)
-        .eq('id', id);
-
-      if (error) throw error;
-      await fetchMessages();
+      // Simular actualización de estado localmente
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === id) {
+          const updates: Partial<ContactMessage> = { 
+            status,
+            updated_at: new Date().toISOString()
+          };
+          
+          if (status === 'responded' && respondedBy && response) {
+            updates.responded_by = respondedBy;
+            updates.responded_at = new Date().toISOString();
+            updates.response = response;
+          }
+          
+          return { ...msg, ...updates };
+        }
+        return msg;
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al actualizar mensaje');
     }
@@ -105,13 +132,8 @@ export function useContactMessages() {
 
   const deleteMessage = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('contact_messages')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      await fetchMessages();
+      // Simular eliminación de mensaje localmente
+      setMessages(prev => prev.filter(msg => msg.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al eliminar mensaje');
     }
@@ -164,13 +186,28 @@ export function useNewsletterSubscriptions() {
   const fetchSubscriptions = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('newsletter_subscriptions')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSubscriptions(data || []);
+      // Usar suscripciones simuladas localmente
+      const mockSubscriptions: NewsletterSubscription[] = [
+        {
+          id: '1',
+          created_at: new Date().toISOString(),
+          email: 'maria@example.com',
+          name: 'María González',
+          preferences: { weekly: true, events: true },
+          is_active: true,
+          subscribed_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          created_at: new Date().toISOString(),
+          email: 'juan@example.com',
+          name: 'Juan Pérez',
+          preferences: { weekly: true, events: false },
+          is_active: true,
+          subscribed_at: new Date().toISOString()
+        }
+      ];
+      setSubscriptions(mockSubscriptions);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar suscripciones');
     } finally {
@@ -180,33 +217,26 @@ export function useNewsletterSubscriptions() {
 
   const subscribe = async (email: string, name?: string, preferences?: Record<string, unknown>) => {
     try {
-      // Verificar si ya existe una suscripción activa
-      const { data: existing } = await supabase
-        .from('newsletter_subscriptions')
-        .select('*')
-        .eq('email', email)
-        .eq('is_active', true)
-        .single();
-
+      // Verificar si ya existe una suscripción activa localmente
+      const existing = subscriptions.find(sub => sub.email === email && sub.is_active);
+      
       if (existing) {
         throw new Error('Este email ya está suscrito al newsletter');
       }
 
-      const { data, error } = await supabase
-        .from('newsletter_subscriptions')
-        .insert([{
-          email,
-          name,
-          preferences,
-          is_active: true,
-          subscribed_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
+      // Simular creación de suscripción localmente
+      const newSubscription: NewsletterSubscription = {
+        id: Date.now().toString(),
+        created_at: new Date().toISOString(),
+        email,
+        name,
+        preferences,
+        is_active: true,
+        subscribed_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
-      await fetchSubscriptions();
-      return data;
+      setSubscriptions(prev => [newSubscription, ...prev]);
+      return newSubscription;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al suscribirse');
       throw err;
@@ -215,16 +245,17 @@ export function useNewsletterSubscriptions() {
 
   const unsubscribe = async (email: string) => {
     try {
-      const { error } = await supabase
-        .from('newsletter_subscriptions')
-        .update({
-          is_active: false,
-          unsubscribed_at: new Date().toISOString()
-        })
-        .eq('email', email);
-
-      if (error) throw error;
-      await fetchSubscriptions();
+      // Simular desuscripción localmente
+      setSubscriptions(prev => prev.map(sub => {
+        if (sub.email === email) {
+          return {
+            ...sub,
+            is_active: false,
+            unsubscribed_at: new Date().toISOString()
+          };
+        }
+        return sub;
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al desuscribirse');
     }
@@ -232,14 +263,13 @@ export function useNewsletterSubscriptions() {
 
   const updatePreferences = async (email: string, preferences: Record<string, unknown>) => {
     try {
-      const { error } = await supabase
-        .from('newsletter_subscriptions')
-        .update({ preferences })
-        .eq('email', email)
-        .eq('is_active', true);
-
-      if (error) throw error;
-      await fetchSubscriptions();
+      // Simular actualización de preferencias localmente
+      setSubscriptions(prev => prev.map(sub => {
+        if (sub.email === email && sub.is_active) {
+          return { ...sub, preferences };
+        }
+        return sub;
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al actualizar preferencias');
     }
@@ -294,22 +324,13 @@ export function useEmailService() {
       setSending(true);
       setError(null);
 
-      // Aquí se integraría con un servicio de email como SendGrid, Resend, etc.
-      // Por ahora, solo actualizamos el estado del mensaje
-      const { error } = await supabase
-        .from('contact_messages')
-        .update({
-          status: 'responded',
-          response,
-          responded_at: new Date().toISOString()
-        })
-        .eq('id', messageId);
-
-      if (error) throw error;
-
+      // Simular envío de email y actualización de mensaje localmente
       // TODO: Implementar envío real de email
       console.log('Email enviado a:', recipientEmail);
       console.log('Respuesta:', response);
+      
+      // Nota: En una implementación real, aquí se actualizaría el mensaje
+      // usando el hook useContactMessages correspondiente
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al enviar respuesta');
@@ -341,16 +362,9 @@ export function useEmailService() {
       setSending(true);
       setError(null);
 
-      // Obtener emails de usuarios registrados al evento
-      const { data: registrations } = await supabase
-        .from('event_registrations')
-        .select(`
-          profiles!inner(email)
-        `)
-        .eq('event_id', eventId)
-        .eq('status', 'confirmed');
-
-      const emails = registrations?.map(r => r.profiles?.email).filter(Boolean) || [];
+      // Simular obtención de emails de usuarios registrados al evento
+      const mockEmails = ['maria@example.com', 'juan@example.com', 'ana@example.com'];
+      const emails = mockEmails;
       
       if (emails.length > 0) {
         // TODO: Implementar envío de notificaciones de evento

@@ -1,7 +1,27 @@
 import { useState, useEffect } from 'react'
-import { User, Session } from '@supabase/supabase-js'
-import { supabase, getCurrentProfile, createProfile, type Profile } from '../lib/supabase'
-import { handleSupabaseError, logError, AppError } from '../lib/errors'
+import { localAuth, type LocalUser as User, type LocalSession as Session } from '../lib/localAuth'
+import { logError, AppError } from '../lib/errors'
+
+// Tipo Profile compatible con el sistema local
+export interface Profile {
+  id: string
+  full_name: string
+  email: string
+  role: 'admin' | 'pastor' | 'leader' | 'member' | 'editor'
+  avatar_url?: string
+  phone?: string
+  bio?: string
+  created_at: string
+  updated_at?: string
+}
+
+// Clase de error de autenticación
+class AuthenticationError extends AppError {
+  constructor(message: string, context?: any) {
+    super(message, 401, true, context)
+    this.name = 'AuthenticationError'
+  }
+}
 
 export interface AuthState {
   user: User | null
@@ -19,6 +39,21 @@ export interface AuthActions {
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: AppError | null }>
 }
 
+// Función para convertir LocalUser a Profile
+function userToProfile(user: User): Profile {
+  return {
+    id: user.id,
+    full_name: user.full_name,
+    email: user.email,
+    role: user.role,
+    avatar_url: user.avatar_url,
+    phone: user.phone,
+    bio: user.bio,
+    created_at: user.created_at,
+    updated_at: user.last_login
+  }
+}
+
 export const useAuth = (): AuthState & AuthActions => {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -27,23 +62,15 @@ export const useAuth = (): AuthState & AuthActions => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Obtener sesión inicial
+    // Obtener sesión inicial del sistema local
     const getInitialSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
+        const currentSession = localAuth.getSession()
         
-        if (error) {
-          const appError = handleSupabaseError(error, { action: 'getSession' })
-          logError(appError)
-          setError(appError.message)
-        } else {
-          setSession(session)
-          setUser(session?.user ?? null)
-          
-          if (session?.user) {
-            const profile = await getCurrentProfile()
-            setProfile(profile)
-          }
+        if (currentSession) {
+          setSession(currentSession)
+          setUser(currentSession.user)
+          setProfile(userToProfile(currentSession.user))
         }
       } catch (err) {
         const appError = new AppError('Error al obtener la sesión', 500, true, { action: 'getInitialSession' })
@@ -56,28 +83,19 @@ export const useAuth = (): AuthState & AuthActions => {
 
     getInitialSession()
 
-    // Escuchar cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session)
-        
-        setSession(session)
-        setUser(session?.user ?? null)
-        setError(null)
-        
-        if (session?.user) {
-          const profile = await getCurrentProfile()
-          setProfile(profile)
-        } else {
-          setProfile(null)
-        }
-        
-        setLoading(false)
+    // Verificar sesión periódicamente (cada 5 minutos)
+    const interval = setInterval(() => {
+      const currentSession = localAuth.getSession()
+      if (!currentSession && user) {
+        // Sesión expirada
+        setUser(null)
+        setProfile(null)
+        setSession(null)
       }
-    )
+    }, 5 * 60 * 1000)
 
     return () => {
-      subscription.unsubscribe()
+      clearInterval(interval)
     }
   }, [])
 
@@ -86,56 +104,18 @@ export const useAuth = (): AuthState & AuthActions => {
       setLoading(true)
       setError(null)
       
-      try {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        })
-        
-        if (error) {
-          const appError = handleSupabaseError(error, { action: 'signIn', email })
-          logError(appError)
-          setError(appError.message)
-          return { error: appError }
-        }
-        
-        return { error: null }
-      } catch (supabaseError) {
-        // Fallback: verificar si hay usuario mock guardado
-        console.warn('Supabase no disponible, verificando usuario mock:', supabaseError)
-        
-        const mockUser = localStorage.getItem('mock_user')
-        if (mockUser) {
-          const user = JSON.parse(mockUser)
-          if (user.email === email) {
-            setUser(user)
-            return { error: null }
-          }
-        }
-        
-        // Si no hay usuario mock, crear uno nuevo
-        const newMockUser = {
-          id: `mock-${Date.now()}`,
-          email,
-          user_metadata: {
-            full_name: email.split('@')[0],
-            phone: ''
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        
-        localStorage.setItem('mock_user', JSON.stringify(newMockUser))
-        localStorage.setItem('mock_session', JSON.stringify({
-          access_token: `mock-token-${Date.now()}`,
-          user: newMockUser
-        }))
-        
-        setUser(newMockUser as any)
+      const result = await localAuth.signIn(email, password)
+      
+      if (result) {
+        setUser(result.user)
+        setSession(result.session)
+        setProfile(userToProfile(result.user))
         return { error: null }
       }
-    } catch (err) {
-      const appError = new AuthenticationError('Error al iniciar sesión', { action: 'signIn', email, originalError: err })
+      
+      return { error: null }
+    } catch (err: any) {
+      const appError = new AuthenticationError(err.message || 'Error al iniciar sesión', { action: 'signIn', email, originalError: err })
       logError(appError)
       setError(appError.message)
       return { error: appError }
@@ -149,64 +129,15 @@ export const useAuth = (): AuthState & AuthActions => {
       setLoading(true)
       setError(null)
       
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: userData.full_name,
-              phone: userData.phone
-            }
-          }
-        })
-        
-        if (error) {
-          const appError = handleSupabaseError(error, { action: 'signUp', email })
-          logError(appError)
-          throw appError
-        }
-        
-        if (data.user) {
-          setUser(data.user)
-        }
-        
-        return data
-      } catch (supabaseError) {
-        // Fallback: simular registro exitoso cuando Supabase no está disponible
-        console.warn('Supabase no disponible, usando fallback para registro:', supabaseError)
-        
-        // Simular usuario registrado
-        const mockUser = {
-          id: `mock-${Date.now()}`,
-          email,
-          user_metadata: {
-            full_name: userData.full_name,
-            phone: userData.phone
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        
-        // Guardar en localStorage para persistencia
-        localStorage.setItem('mock_user', JSON.stringify(mockUser))
-        localStorage.setItem('mock_session', JSON.stringify({
-          access_token: `mock-token-${Date.now()}`,
-          user: mockUser
-        }))
-        
-        setUser(mockUser as any)
-        
-        return {
-          user: mockUser,
-          session: {
-            access_token: `mock-token-${Date.now()}`,
-            user: mockUser
-          }
-        }
-      }
-    } catch (err) {
-      const appError = new AppError('Error al registrar usuario', 500, true, { action: 'signUp', email, originalError: err })
+      const result = await localAuth.signUp(email, password, userData.full_name)
+      
+      setUser(result.user)
+      setSession(result.session)
+      setProfile(userToProfile(result.user))
+      
+      return { error: null }
+    } catch (err: any) {
+      const appError = new AppError(err.message || 'Error al registrar usuario', 500, true, { action: 'signUp', email, originalError: err })
       logError(appError)
       setError(appError.message)
       return { error: appError }
@@ -220,18 +151,15 @@ export const useAuth = (): AuthState & AuthActions => {
       setLoading(true)
       setError(null)
       
-      const { error } = await supabase.auth.signOut()
+      localAuth.signOut()
       
-      if (error) {
-        const appError = handleSupabaseError(error, { action: 'signOut' })
-        logError(appError)
-        setError(appError.message)
-        return { error: appError }
-      }
+      setUser(null)
+      setSession(null)
+      setProfile(null)
       
       return { error: null }
-    } catch (err) {
-      const appError = new AppError('Error al cerrar sesión', 500, true, { action: 'signOut', originalError: err })
+    } catch (err: any) {
+      const appError = new AppError(err.message || 'Error al cerrar sesión', 500, true, { action: 'signOut', originalError: err })
       logError(appError)
       setError(appError.message)
       return { error: appError }
@@ -244,20 +172,11 @@ export const useAuth = (): AuthState & AuthActions => {
     try {
       setError(null)
       
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
-      })
-      
-      if (error) {
-        const appError = handleSupabaseError(error, { action: 'resetPassword', email })
-        logError(appError)
-        setError(appError.message)
-        return { error: appError }
-      }
+      await localAuth.resetPassword(email)
       
       return { error: null }
-    } catch (err) {
-      const appError = new AppError('Error al enviar email de recuperación', 500, true, { action: 'resetPassword', email, originalError: err })
+    } catch (err: any) {
+      const appError = new AppError(err.message || 'Error al enviar email de recuperación', 500, true, { action: 'resetPassword', email, originalError: err })
       logError(appError)
       setError(appError.message)
       return { error: appError }
@@ -275,27 +194,22 @@ export const useAuth = (): AuthState & AuthActions => {
         return { error: appError }
       }
       
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id)
-        .select()
-        .single()
-      
-      if (error) {
-        const appError = handleSupabaseError(error, { action: 'updateProfile', userId: user.id })
-        logError(appError)
-        setError(appError.message)
-        return { error: appError }
+      // Convertir updates de Profile a LocalUser
+      const userUpdates: Partial<User> = {
+        full_name: updates.full_name,
+        avatar_url: updates.avatar_url,
+        phone: updates.phone,
+        bio: updates.bio
       }
       
-      if (data) {
-        setProfile(data)
-      }
+      const updatedUser = await localAuth.updateProfile(user.id, userUpdates)
+      
+      setUser(updatedUser)
+      setProfile(userToProfile(updatedUser))
       
       return { error: null }
-    } catch (err) {
-      const appError = new AppError('Error al actualizar perfil', 500, true, { action: 'updateProfile', userId: user?.id, originalError: err })
+    } catch (err: any) {
+      const appError = new AppError(err.message || 'Error al actualizar perfil', 500, true, { action: 'updateProfile', userId: user?.id, originalError: err })
       logError(appError)
       setError(appError.message)
       return { error: appError }

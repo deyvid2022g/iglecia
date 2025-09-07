@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, type Event } from '../lib/supabase'
+import { type Event } from '../lib/supabase'
 import { useAuth } from './useAuth'
 
 export interface EventsState {
@@ -105,83 +105,34 @@ export const useEvents = (options?: {
       setLoading(true)
       setError(null)
 
+      // Simular delay de carga
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       // Intentar cargar desde localStorage primero
       const localEvents = localStorage.getItem('church_events')
+      let allEvents: Event[]
+      
       if (localEvents) {
-        let parsedEvents = JSON.parse(localEvents)
-        
-        // Aplicar filtros localmente
-        if (options?.published !== undefined) {
-          parsedEvents = parsedEvents.filter((event: Event) => event.is_published === options.published)
-        }
-        if (options?.type) {
-          parsedEvents = parsedEvents.filter((event: Event) => event.type === options.type)
-        }
-        if (options?.limit) {
-          parsedEvents = parsedEvents.slice(0, options.limit)
-        }
-        
-        setEvents(parsedEvents)
-        setLoading(false)
-        return
+        allEvents = JSON.parse(localEvents)
+      } else {
+        // Usar datos de ejemplo por defecto
+        allEvents = getDefaultEvents()
+        localStorage.setItem('church_events', JSON.stringify(allEvents))
       }
-
-      // Si no hay datos locales, intentar Supabase
-      try {
-        let query = supabase
-          .from('events')
-          .select(`
-            *,
-            locations(
-              id,
-              name,
-              address,
-              full_address
-            )
-          `)
-          .order('event_date', { ascending: true })
-
-        // Aplicar filtros
-        if (options?.published !== undefined) {
-          query = query.eq('is_published', options.published)
-        }
-        if (options?.type) {
-          query = query.eq('type', options.type)
-        }
-        if (options?.limit) {
-          query = query.limit(options.limit)
-        }
-
-        const { data, error } = await query
-
-        if (error) throw error
-        
-        setEvents(data || [])
-        // Guardar en localStorage para uso futuro
-        if (data) {
-          localStorage.setItem('church_events', JSON.stringify(data))
-        }
-      } catch (supabaseError) {
-        console.warn('Supabase no disponible, usando datos de ejemplo:', supabaseError)
-        // Usar datos de ejemplo si Supabase falla
-        const defaultEvents = getDefaultEvents()
-        let filteredEvents = defaultEvents
-        
-        // Aplicar filtros a los datos de ejemplo
-        if (options?.published !== undefined) {
-          filteredEvents = filteredEvents.filter(event => event.is_published === options.published)
-        }
-        if (options?.type) {
-          filteredEvents = filteredEvents.filter(event => event.type === options.type)
-        }
-        if (options?.limit) {
-          filteredEvents = filteredEvents.slice(0, options.limit)
-        }
-        
-        setEvents(filteredEvents)
-        // Guardar datos de ejemplo en localStorage
-        localStorage.setItem('church_events', JSON.stringify(defaultEvents))
+      
+      // Aplicar filtros localmente
+      let filteredEvents = allEvents
+      if (options?.published !== undefined) {
+        filteredEvents = filteredEvents.filter((event: Event) => event.is_published === options.published)
       }
+      if (options?.type) {
+        filteredEvents = filteredEvents.filter((event: Event) => event.type === options.type)
+      }
+      if (options?.limit) {
+        filteredEvents = filteredEvents.slice(0, options.limit)
+      }
+      
+      setEvents(filteredEvents)
     } catch (error) {
       setError('Error al cargar eventos')
       console.error('Error in fetchEvents:', error)
@@ -196,87 +147,108 @@ export const useEvents = (options?: {
 
   const createEvent = async (eventData: Omit<Event, 'id' | 'created_at' | 'updated_at' | 'current_registrations'>) => {
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .insert({
-          ...eventData,
-          created_by: user?.id,
-          current_registrations: 0
-        })
-        .select()
-        .single()
-
-      if (!error && data) {
-        setEvents(prev => [...prev, data])
+      // Simular delay de creación
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Crear nuevo evento con datos simulados
+      const newEvent: Event = {
+        ...eventData,
+        id: Date.now().toString(),
+        created_by: user?.id || null,
+        current_registrations: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
-
-      return { data, error }
-    } catch (_) {
-      console.error('Error creating event:', _)
-      return { data: null, error: _ }
+      
+      // Actualizar estado local
+      setEvents(prev => [...prev, newEvent])
+      
+      // Actualizar localStorage
+      const localEvents = localStorage.getItem('church_events')
+      const allEvents = localEvents ? JSON.parse(localEvents) : []
+      allEvents.push(newEvent)
+      localStorage.setItem('church_events', JSON.stringify(allEvents))
+      
+      return { data: newEvent, error: null }
+    } catch (error) {
+      console.error('Error creating event:', error)
+      return { data: null, error: error as Error }
     }
   }
 
   const updateEvent = async (id: string, updates: Partial<Event>) => {
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
-
-      if (!error && data) {
-        setEvents(prev => prev.map(event => event.id === id ? data : event))
+      // Simular delay de actualización
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Buscar evento en localStorage
+      const localEvents = localStorage.getItem('church_events')
+      const allEvents = localEvents ? JSON.parse(localEvents) : []
+      const eventIndex = allEvents.findIndex((event: Event) => event.id === id)
+      
+      if (eventIndex === -1) {
+        return { data: null, error: new Error('Evento no encontrado') }
       }
-
-      return { data, error }
-    } catch (_) {
-      console.error('Error updating event:', _)
-      return { data: null, error: _ }
+      
+      // Actualizar evento
+      const updatedEvent = {
+        ...allEvents[eventIndex],
+        ...updates,
+        updated_at: new Date().toISOString()
+      }
+      
+      allEvents[eventIndex] = updatedEvent
+      localStorage.setItem('church_events', JSON.stringify(allEvents))
+      
+      // Actualizar estado local
+      setEvents(prev => prev.map(event => event.id === id ? updatedEvent : event))
+      
+      return { data: updatedEvent, error: null }
+    } catch (error) {
+      console.error('Error updating event:', error)
+      return { data: null, error: error as Error }
     }
   }
 
   const deleteEvent = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', id)
-
-      if (!error) {
-        setEvents(prev => prev.filter(event => event.id !== id))
-      }
-
-      return { error }
-    } catch (_) {
-      console.error('Error deleting event:', _)
-      return { error: _ }
+      // Simular delay de eliminación
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Eliminar de localStorage
+      const localEvents = localStorage.getItem('church_events')
+      const allEvents = localEvents ? JSON.parse(localEvents) : []
+      const filteredEvents = allEvents.filter((event: Event) => event.id !== id)
+      localStorage.setItem('church_events', JSON.stringify(filteredEvents))
+      
+      // Actualizar estado local
+      setEvents(prev => prev.filter(event => event.id !== id))
+      
+      return { error: null }
+    } catch (error) {
+      console.error('Error deleting event:', error)
+      return { error: error as Error }
     }
   }
 
   const getEventBySlug = async (slug: string) => {
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select(`
-          *,
-          locations(
-            id,
-            name,
-            address,
-            full_address,
-            latitude,
-            longitude
-          )
-        `)
-        .eq('slug', slug)
-        .single()
-
-      return { data, error }
-    } catch (_) {
-      console.error('Error getting event by slug:', _)
-      return { data: null, error: _ }
+      // Simular delay de búsqueda
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Buscar en localStorage
+      const localEvents = localStorage.getItem('church_events')
+      const allEvents = localEvents ? JSON.parse(localEvents) : getDefaultEvents()
+      const event = allEvents.find((event: Event) => event.slug === slug)
+      
+      if (!event) {
+        return { data: null, error: new Error('Evento no encontrado') }
+      }
+      
+      return { data: event, error: null }
+    } catch (error) {
+      console.error('Error getting event by slug:', error)
+      return { data: null, error: error as Error }
     }
   }
 
@@ -288,65 +260,78 @@ export const useEvents = (options?: {
     special_requests?: string
   }) => {
     try {
-      // Insertar registro
-      const { error: registrationError } = await supabase
-        .from('event_registrations')
-        .insert({
-          event_id: eventId,
-          user_id: user?.id,
-          ...registrationData,
-          guests: registrationData.guests || 1
-        })
-
-      if (registrationError) {
-        return { error: registrationError }
+      // Simular delay de registro
+      await new Promise(resolve => setTimeout(resolve, 400))
+      
+      // Crear registro simulado
+      const registration = {
+        id: Date.now().toString(),
+        event_id: eventId,
+        user_id: user?.id || null,
+        ...registrationData,
+        guests: registrationData.guests || 1,
+        status: 'confirmed',
+        registration_date: new Date().toISOString()
       }
-
-      // Actualizar contador de registros
-      const { error: updateError } = await supabase
-        .from('events')
-        .update({
-          current_registrations: supabase.rpc('increment_registrations', { 
-            event_id: eventId,
-            increment_by: registrationData.guests || 1 
-          })
-        })
-        .eq('id', eventId)
-
-      if (updateError) {
-        console.error('Error updating registration count:', updateError)
+      
+      // Guardar registro en localStorage
+      const localRegistrations = localStorage.getItem('event_registrations')
+      const allRegistrations = localRegistrations ? JSON.parse(localRegistrations) : []
+      allRegistrations.push(registration)
+      localStorage.setItem('event_registrations', JSON.stringify(allRegistrations))
+      
+      // Actualizar contador de registros del evento
+      const localEvents = localStorage.getItem('church_events')
+      const allEvents = localEvents ? JSON.parse(localEvents) : []
+      const eventIndex = allEvents.findIndex((event: Event) => event.id === eventId)
+      
+      if (eventIndex !== -1) {
+        allEvents[eventIndex].current_registrations += registration.guests
+        localStorage.setItem('church_events', JSON.stringify(allEvents))
+        
+        // Actualizar estado local
+        setEvents(prev => prev.map(event => 
+          event.id === eventId 
+            ? { ...event, current_registrations: event.current_registrations + registration.guests }
+            : event
+        ))
       }
-
-      // Refrescar eventos
-      await fetchEvents()
-
+      
       return { error: null }
-    } catch (_) {
-      console.error('Error registering for event:', _)
-      return { error: _ }
+    } catch (error) {
+      console.error('Error registering for event:', error)
+      return { error: error as Error }
     }
   }
 
   const getEventRegistrations = async (eventId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('event_registrations')
-        .select(`
-          *,
-          profiles(
-            name,
-            email,
-            avatar_url
-          )
-        `)
-        .eq('event_id', eventId)
-        .eq('status', 'confirmed')
-        .order('registration_date', { ascending: false })
-
-      return { data, error }
-    } catch (_) {
-      console.error('Error getting event registrations:', _)
-      return { data: null, error: _ }
+      // Simular delay de búsqueda
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Buscar registros en localStorage
+      const localRegistrations = localStorage.getItem('event_registrations')
+      const allRegistrations = localRegistrations ? JSON.parse(localRegistrations) : []
+      
+      // Filtrar registros por evento y estado
+      const eventRegistrations = allRegistrations
+        .filter((reg: any) => reg.event_id === eventId && reg.status === 'confirmed')
+        .map((reg: any) => ({
+          id: reg.id,
+          name: reg.name,
+          email: reg.email,
+          status: reg.status,
+          registration_date: reg.registration_date,
+          guests: reg.guests,
+          phone: reg.phone,
+          special_requests: reg.special_requests
+        }))
+        .sort((a: any, b: any) => new Date(b.registration_date).getTime() - new Date(a.registration_date).getTime())
+      
+      return { data: eventRegistrations, error: null }
+    } catch (error) {
+      console.error('Error getting event registrations:', error)
+      return { data: null, error: error as Error }
     }
   }
 
@@ -382,26 +367,55 @@ export const useEvent = (slug: string) => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('events')
-          .select(`
-            *,
-            locations(
-              id,
-              name,
-              address,
-              full_address,
-              latitude,
-              longitude
-            )
-          `)
-          .eq('slug', slug)
-          .single()
+        // Simular delay de carga
+        await new Promise(resolve => setTimeout(resolve, 300))
 
-        if (error) {
-          setError(error.message)
+        // Buscar en localStorage
+        const localEvents = localStorage.getItem('church_events')
+        let allEvents: Event[]
+        
+        if (localEvents) {
+          allEvents = JSON.parse(localEvents)
         } else {
-          setEvent(data)
+          // Usar datos de ejemplo por defecto
+          const getDefaultEvents = (): Event[] => {
+            const today = new Date()
+            const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+            const nextMonth = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+            
+            return [
+              {
+                id: '1',
+                slug: 'culto-dominical',
+                title: 'Culto Dominical',
+                description: 'Únete a nosotros para un tiempo de adoración y enseñanza bíblica.',
+                detailed_description: 'Nuestro culto dominical incluye tiempo de adoración, oración y una enseñanza bíblica inspiradora.',
+                event_date: today.toISOString().split('T')[0],
+                start_time: '10:00',
+                end_time: '12:00',
+                type: 'Culto',
+                capacity: 200,
+                current_registrations: 0,
+                image_url: '/pastor-reynel-duenas.jpg',
+                host: 'Pastor Reynel Dueñas',
+                requires_rsvp: false,
+                cost: 'Gratuito',
+                is_published: true,
+                created_at: today.toISOString(),
+                updated_at: today.toISOString()
+              }
+            ]
+          }
+          allEvents = getDefaultEvents()
+          localStorage.setItem('church_events', JSON.stringify(allEvents))
+        }
+        
+        const foundEvent = allEvents.find(e => e.slug === slug)
+        
+        if (!foundEvent) {
+          setError('Evento no encontrado')
+        } else {
+          setEvent(foundEvent)
         }
       } catch (_) {
         setError('Error al cargar evento')

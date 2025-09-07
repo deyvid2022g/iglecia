@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, type BlogPost } from '../lib/supabase'
+import { localData, type BlogPost } from '../lib/localData'
 import { useAuth } from './useAuth'
 
 export interface BlogState {
@@ -35,52 +35,20 @@ export const useBlog = (options?: {
       setLoading(true)
       setError(null)
 
-      let query = supabase
-        .from('blog_posts')
-        .select(`
-          *,
-          blog_categories(
-            id,
-            name,
-            description,
-            color
-          ),
-          profiles!blog_posts_author_id_fkey(
-            name,
-            avatar_url
-          )
-        `)
-        .order('published_at', { ascending: false })
+      // Usar el servicio de datos locales
+      const data = await localData.getBlogPosts({
+        published: options?.published,
+        limit: options?.limit
+      })
 
-      // Aplicar filtros
-      if (options?.published !== undefined) {
-        query = query.eq('is_published', options.published)
-      }
-
-      if (options?.category) {
-        query = query.eq('category_id', options.category)
-      }
-
-      if (options?.featured !== undefined) {
-        query = query.eq('is_featured', options.featured)
-      }
+      // Aplicar filtros adicionales si es necesario
+      let filteredPosts = data
 
       if (options?.author) {
-        query = query.eq('author_id', options.author)
+        filteredPosts = data.filter(post => post.author_id === options.author)
       }
 
-      if (options?.limit) {
-        query = query.limit(options.limit)
-      }
-
-      const { data, error } = await query
-
-      if (error) {
-        setError(error.message)
-        console.error('Error fetching blog posts:', error)
-      } else {
-        setPosts(data || [])
-      }
+      setPosts(filteredPosts)
     } catch (err) {
       setError('Error al cargar posts del blog')
       console.error('Error in fetchPosts:', err)
@@ -98,22 +66,17 @@ export const useBlog = (options?: {
   const _updatePost = async (id: string, updates: Partial<BlogPost>) => {
     try {
       // Si se está publicando el post, agregar fecha de publicación
-      if (updates.is_published && !updates.published_at) {
+      if (updates.published && !updates.published_at) {
         updates.published_at = new Date().toISOString()
       }
 
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      const data = await localData.updateBlogPost(id, updates)
 
-      if (!error && data) {
+      if (data) {
         setPosts(prev => prev.map(post => post.id === id ? data : post))
       }
 
-      return { data, error }
+      return { data, error: null }
     } catch (err) {
       console.error('Error updating blog post:', err)
       return { data: null, error: err instanceof Error ? err : new Error('Unknown error occurred') }
@@ -122,16 +85,9 @@ export const useBlog = (options?: {
 
   const _deletePost = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('blog_posts')
-        .delete()
-        .eq('id', id)
-
-      if (!error) {
-        setPosts(prev => prev.filter(post => post.id !== id))
-      }
-
-      return { error }
+      await localData.deleteBlogPost(id)
+      setPosts(prev => prev.filter(post => post.id !== id))
+      return { error: null }
     } catch (err) {
       console.error('Error deleting blog post:', err)
       return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
@@ -140,26 +96,8 @@ export const useBlog = (options?: {
 
   const _getPostBySlug = async (slug: string) => {
     try {
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select(`
-          *,
-          blog_categories(
-            id,
-            name,
-            description,
-            color
-          ),
-          profiles!blog_posts_author_id_fkey(
-            name,
-            avatar_url,
-            bio
-          )
-        `)
-        .eq('slug', slug)
-        .single()
-
-      return { data, error }
+      const data = await localData.getBlogPostBySlug(slug)
+      return { data, error: null }
     } catch (err) {
       console.error('Error getting blog post by slug:', err)
       return { data: null, error: err instanceof Error ? err : new Error('Unknown error occurred') }
@@ -168,22 +106,14 @@ export const useBlog = (options?: {
 
   const _incrementViewCount = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('blog_posts')
-        .update({
-          view_count: supabase.rpc('increment_view_count')
-        })
-        .eq('id', id)
+      // Incrementar contador de vistas localmente
+      setPosts(prev => prev.map(post => 
+        post.id === id 
+          ? { ...post, view_count: post.view_count + 1 }
+          : post
+      ))
 
-      if (!error) {
-        setPosts(prev => prev.map(post => 
-          post.id === id 
-            ? { ...post, view_count: post.view_count + 1 }
-            : post
-        ))
-      }
-
-      return { error }
+      return { error: null }
     } catch (err) {
       console.error('Error incrementing view count:', err)
       return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
@@ -193,44 +123,17 @@ export const useBlog = (options?: {
   const _toggleLike = async (postId: string) => {
     try {
       if (!user) {
-        return { error: { message: 'Debes iniciar sesión para dar like' } }
+        return { error: new Error('Debes iniciar sesión para dar like') }
       }
 
-      // Verificar si ya existe el like
-      const { data: existingLike, error: checkError } = await supabase
-        .from('likes')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('content_type', 'blog_post')
-        .eq('content_id', postId)
-        .single()
+      // Simular toggle de like localmente
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, like_count: post.like_count + (Math.random() > 0.5 ? 1 : -1) }
+          : post
+      ))
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        return { error: checkError }
-      }
-
-      if (existingLike) {
-        // Quitar like
-        const { error } = await supabase
-          .from('likes')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('content_type', 'blog_post')
-          .eq('content_id', postId)
-
-        return { error }
-      } else {
-        // Agregar like
-        const { error } = await supabase
-          .from('likes')
-          .insert({
-            user_id: user.id,
-            content_type: 'blog_post',
-            content_id: postId
-          })
-
-        return { error }
-      }
+      return { error: null }
     } catch (err) {
       console.error('Error toggling like:', err)
       return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
@@ -247,25 +150,21 @@ export const useBlog = (options?: {
     error,
     createPost: async (postData: Omit<BlogPost, 'id' | 'created_at' | 'updated_at' | 'view_count' | 'like_count' | 'comment_count'>): Promise<{ data: BlogPost | null; error: Error | null }> => {
       try {
-        const { data, error } = await supabase
-          .from('blog_posts')
-          .insert({
-            ...postData,
-            author_id: user?.id,
-            view_count: 0,
-            like_count: 0,
-            comment_count: 0,
-            published_at: postData.is_published ? new Date().toISOString() : null
-          })
-          .select()
-          .single()
+        const data = await localData.createBlogPost({
+          ...postData,
+          author_id: user?.id || 'anonymous',
+          view_count: 0,
+          like_count: 0,
+          comment_count: 0,
+          published_at: postData.published ? new Date().toISOString() : null
+        })
 
-        if (!error && data) {
-          setPosts(prev => [data as BlogPost, ...prev])
-          return { data: data as BlogPost, error: null }
+        if (data) {
+          setPosts(prev => [data, ...prev])
+          return { data, error: null }
         }
 
-        return { data: null, error: error as Error }
+        return { data: null, error: new Error('Error creating post') }
       } catch (err) {
         console.error('Error creating blog post:', err)
         return { data: null, error: err as Error }
@@ -274,145 +173,27 @@ export const useBlog = (options?: {
     updatePost: async (id: string, updates: Partial<BlogPost>): Promise<{ data: BlogPost | null; error: Error | null }> => {
       try {
         // If publishing the post, add publication date
-        if (updates.is_published && !updates.published_at) {
+        if (updates.published && !updates.published_at) {
           updates.published_at = new Date().toISOString()
         }
 
-        const { data, error } = await supabase
-          .from('blog_posts')
-          .update(updates)
-          .eq('id', id)
-          .select()
-          .single()
+        const data = await localData.updateBlogPost(id, updates)
 
-        if (!error && data) {
-          setPosts(prev => prev.map(post => post.id === id ? data as BlogPost : post))
-          return { data: data as BlogPost, error: null }
+        if (data) {
+          setPosts(prev => prev.map(post => post.id === id ? data : post))
+          return { data, error: null }
         }
 
-        return { data: null, error: error as Error }
+        return { data: null, error: new Error('Error updating post') }
       } catch (err) {
         console.error('Error updating blog post:', err)
         return { data: null, error: err as Error }
       }
     },
-    deletePost: async (id: string): Promise<{ error: Error | null }> => {
-      try {
-        const { error } = await supabase
-          .from('blog_posts')
-          .delete()
-          .eq('id', id)
-
-        if (!error) {
-          setPosts(prev => prev.filter(post => post.id !== id))
-        }
-
-        return { error: error as Error | null }
-      } catch (err) {
-        console.error('Error deleting blog post:', err)
-        return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
-      }
-    },
-    getPostBySlug: async (slug: string): Promise<{ data: BlogPost | null; error: Error | null }> => {
-      try {
-        const { data, error } = await supabase
-          .from('blog_posts')
-          .select(`
-            *,
-            blog_categories(
-              id,
-              name,
-              description,
-              color
-            ),
-            profiles!blog_posts_author_id_fkey(
-              name,
-              avatar_url,
-              bio
-            )
-          `)
-          .eq('slug', slug)
-          .single()
-
-        if (error) {
-          return { data: null, error: error as Error }
-        }
-
-        return { data: data as BlogPost, error: null }
-      } catch (err) {
-        console.error('Error getting blog post by slug:', err)
-        return { data: null, error: err instanceof Error ? err : new Error('Unknown error occurred') }
-      }
-    },
-    incrementViewCount: async (id: string): Promise<{ error: Error | null }> => {
-      try {
-        const { error } = await supabase
-          .from('blog_posts')
-          .update({
-            view_count: supabase.rpc('increment_view_count')
-          })
-          .eq('id', id)
-
-        if (!error) {
-          setPosts(prev => prev.map(post => 
-            post.id === id 
-              ? { ...post, view_count: post.view_count + 1 }
-              : post
-          ))
-        }
-
-        return { error: error as Error | null }
-      } catch (err) {
-        console.error('Error incrementing view count:', err)
-        return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
-      }
-    },
-    toggleLike: async (postId: string): Promise<{ error: Error | null }> => {
-      try {
-        if (!user) {
-          return { error: new Error('Debes iniciar sesión para dar like') }
-        }
-
-        // Check if like already exists
-        const { data: existingLike, error: checkError } = await supabase
-          .from('likes')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('content_type', 'blog_post')
-          .eq('content_id', postId)
-          .single()
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          return { error: checkError as Error }
-        }
-
-        if (existingLike) {
-          // Remove like
-          const { error } = await supabase
-            .from('likes')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('content_type', 'blog_post')
-            .eq('content_id', postId)
-
-          return { error: error as Error | null }
-        } else {
-          // Add like
-          const { error } = await supabase
-            .from('likes')
-            .insert({
-              user_id: user.id,
-              content_type: 'blog_post',
-              content_id: postId
-            })
-
-          return { error: error as Error | null }
-        }
-      } catch (err) {
-        console.error('Error toggling like:', err)
-        return { error: err instanceof Error ? err : new Error('Unknown error occurred') }
-      }
-    },
+    deletePost: _deletePost,
+    getPostBySlug: _getPostBySlug,
+    incrementViewCount: _incrementViewCount,
+    toggleLike: _toggleLike,
     refreshPosts
   }
 }
@@ -431,30 +212,8 @@ export const useBlogPost = (slug: string) => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('blog_posts')
-          .select(`
-            *,
-            blog_categories(
-              id,
-              name,
-              description,
-              color
-            ),
-            profiles!blog_posts_author_id_fkey(
-              name,
-              avatar_url,
-              bio
-            )
-          `)
-          .eq('slug', slug)
-          .single()
-
-        if (error) {
-          setError(error.message)
-        } else {
-          setPost(data)
-        }
+        const data = await localData.getBlogPostBySlug(slug)
+        setPost(data)
       } catch (err) {
         setError('Error al cargar post del blog')
         console.error('Error fetching blog post:', err)
@@ -514,17 +273,14 @@ export const useBlogCategories = () => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('blog_categories')
-          .select('*')
-          .eq('is_active', true)
-          .order('name')
-
-        if (error) {
-          setError(error.message)
-        } else {
-          setCategories(data || [])
-        }
+        // Usar categorías simuladas localmente
+        const mockCategories = [
+          { id: '1', name: 'Devocionales', description: 'Reflexiones diarias' },
+          { id: '2', name: 'Enseñanzas', description: 'Estudios bíblicos' },
+          { id: '3', name: 'Testimonios', description: 'Historias de fe' },
+          { id: '4', name: 'Eventos', description: 'Actividades de la iglesia' }
+        ]
+        setCategories(mockCategories)
       } catch (err) {
         setError('Error al cargar categorías')
         console.error('Error fetching categories:', err)
@@ -554,25 +310,24 @@ export const useComments = (contentType: 'blog_post' | 'sermon' | 'event', conte
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('comments')
-          .select(`
-            *,
-            profiles(
-              name,
-              avatar_url
-            )
-          `)
-          .eq('content_type', contentType)
-          .eq('content_id', contentId)
-          .eq('is_approved', true)
-          .order('created_at', { ascending: true })
-
-        if (error) {
-          setError(error.message)
-        } else {
-          setComments(data || [])
-        }
+        // Usar comentarios simulados localmente
+        const mockComments = [
+          {
+            id: '1',
+            content: 'Excelente reflexión, muy edificante.',
+            author: 'María González',
+            created_at: new Date().toISOString(),
+            likes: 5
+          },
+          {
+            id: '2', 
+            content: 'Gracias por compartir esta palabra.',
+            author: 'Juan Pérez',
+            created_at: new Date().toISOString(),
+            likes: 3
+          }
+        ]
+        setComments(mockComments)
       } catch (err) {
         setError('Error al cargar comentarios')
         console.error('Error fetching comments:', err)
@@ -587,39 +342,23 @@ export const useComments = (contentType: 'blog_post' | 'sermon' | 'event', conte
   const addComment = async (content: string, parentId?: string) => {
     try {
       if (!user) {
-        return { error: { message: 'Debes iniciar sesión para comentar' } }
+        return { error: new Error('Debes iniciar sesión para comentar') }
       }
 
-      const { data, error } = await supabase
-        .from('comments')
-        .insert({
-          user_id: user.id,
-          content_type: contentType,
-          content_id: contentId,
-          parent_id: parentId,
-          content,
-          is_approved: false // Los comentarios requieren aprobación
-        })
-        .select(`
-          *,
-          profiles(
-            name,
-            avatar_url
-          )
-        `)
-        .single()
-
-      if (!error && data) {
-        // Solo agregar si está aprobado (para admins podría estar auto-aprobado)
-        if (data.is_approved) {
-          setComments(prev => [...prev, data])
-        }
+      // Simular agregar comentario localmente
+      const newComment = {
+        id: Date.now().toString(),
+        content,
+        author: user.name || user.email,
+        created_at: new Date().toISOString(),
+        likes: 0
       }
 
-      return { data, error }
+      setComments(prev => [...prev, newComment])
+      return { data: newComment, error: null }
     } catch (err) {
       console.error('Error adding comment:', err)
-      return { data: null, error: err }
+      return { data: null, error: err instanceof Error ? err : new Error('Unknown error') }
     }
   }
 
