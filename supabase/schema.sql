@@ -130,6 +130,11 @@ USING (
   )
 );
 
+-- Política para permitir la inserción automática de nuevos usuarios
+CREATE POLICY "Allow automatic user creation" ON public.users
+FOR INSERT
+WITH CHECK (true);
+
 -- Crear políticas de seguridad para la tabla events
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
@@ -260,9 +265,39 @@ USING (
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.users (id, name, email, role)
-  VALUES (NEW.id, NEW.raw_user_meta_data->>'name', NEW.email, 'member');
-  RETURN NEW;
+    -- Verificar si el usuario ya existe en public.users
+    IF EXISTS (SELECT 1 FROM public.users WHERE id = NEW.id) THEN
+        -- Si ya existe, actualizar la información
+        UPDATE public.users SET
+            email = NEW.email,
+            name = COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
+            role = COALESCE(NEW.raw_user_meta_data->>'role', 'member'),
+            updated_at = NOW()
+        WHERE id = NEW.id;
+        
+        RAISE NOTICE 'Usuario actualizado en public.users: %', NEW.id;
+    ELSE
+        -- Si no existe, insertarlo
+        INSERT INTO public.users (id, email, name, role, created_at, updated_at)
+        VALUES (
+            NEW.id,
+            NEW.email,
+            COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
+            COALESCE(NEW.raw_user_meta_data->>'role', 'member'),
+            NEW.created_at,
+            NOW()
+        );
+        
+        RAISE NOTICE 'Usuario insertado en public.users: %', NEW.id;
+    END IF;
+    
+    RETURN NEW;
+EXCEPTION
+    WHEN others THEN
+        -- Log detallado del error
+        RAISE WARNING 'Error en handle_new_user para usuario %: % - %', NEW.id, SQLSTATE, SQLERRM;
+        -- No fallar el proceso de autenticación
+        RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

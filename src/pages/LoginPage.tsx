@@ -1,410 +1,311 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { isValidEmail, validatePassword, resendConfirmationEmail } from '../utils/authUtils';
 
-export function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    phone: '',
-    confirmPassword: ''
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showResendEmail, setShowResendEmail] = useState(false);
-  const [resendingEmail, setResendingEmail] = useState(false);
-  
-  const { login, register, loading, isAuthenticated } = useAuth();
+interface LoginFormData {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
+
+interface FormErrors {
+  email?: string;
+  password?: string;
+  general?: string;
+}
+
+const LoginPage: React.FC = () => {
+  const { signIn, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
-  const from = location.state?.from?.pathname || '/';
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    password: '',
+    rememberMe: false
+  });
+  
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
+  // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated && !loading) {
+    if (isAuthenticated) {
+      const from = (location.state as any)?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
-  }, [isAuthenticated, loading, navigate, from]);
+  }, [isAuthenticated, navigate, location]);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.email) {
-      newErrors.email = 'El correo electrónico es requerido';
-    } else if (!isValidEmail(formData.email)) {
-      newErrors.email = 'Ingresa un correo electrónico válido';
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+    
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = 'El email es requerido';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Por favor ingresa un email válido';
     }
-
+    
+    // Password validation
     if (!formData.password) {
       newErrors.password = 'La contraseña es requerida';
-    } else {
-      const passwordValidation = validatePassword(formData.password);
-      if (!passwordValidation.isValid) {
-        newErrors.password = passwordValidation.errors[0];
-      }
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
     }
-
-    if (!isLogin) {
-      if (!formData.name) {
-        newErrors.name = 'El nombre es requerido';
-      }
-      
-      if (!formData.confirmPassword) {
-        newErrors.confirmPassword = 'Confirma tu contraseña';
-      } else if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Las contraseñas no coinciden';
-      }
-    }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+    
+    // Clear specific field error when user starts typing
+    if (errors[name as keyof FormErrors]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
     
     setIsSubmitting(true);
     setErrors({});
-    setShowResendEmail(false);
     
     try {
-      if (isLogin) {
-        await login(formData.email, formData.password);
-        // La navegación se maneja en el useEffect
-      } else {
-        await register({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          phone: formData.phone
-        });
-        // Mostrar mensaje de éxito para registro
-        setErrors({ submit: '' });
-        // La navegación se maneja en el useEffect
-      }
-    } catch (error: any) {
-      console.error('Error de autenticación:', error);
-      const errorMessage = error.message || 'Ocurrió un error inesperado. Inténtalo de nuevo.';
-      setErrors({ submit: errorMessage });
+      const { error } = await signIn(formData.email, formData.password, formData.rememberMe);
       
-      // Mostrar opción de reenvío de email si es un error de confirmación
-      if (errorMessage.includes('confirma tu correo') || errorMessage.includes('Email not confirmed')) {
-        setShowResendEmail(true);
+      if (error) {
+        let errorMessage = 'Error al iniciar sesión';
+        
+        switch (error.message) {
+          case 'Invalid login credentials':
+            errorMessage = 'Email o contraseña incorrectos';
+            break;
+          case 'Email not confirmed':
+            errorMessage = 'Por favor confirma tu email antes de iniciar sesión';
+            break;
+          case 'Too many requests':
+            errorMessage = 'Demasiados intentos. Intenta de nuevo más tarde';
+            break;
+          default:
+            errorMessage = error.message || 'Error al iniciar sesión';
+        }
+        
+        setErrors({ general: errorMessage });
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrors({ general: 'Error inesperado. Por favor intenta de nuevo.' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleResendEmail = async () => {
-    if (!formData.email) {
-      setErrors({ submit: 'Ingresa tu correo electrónico para reenviar la confirmación' });
+  const handleForgotPassword = async () => {
+    if (!formData.email.trim()) {
+      setErrors({ email: 'Ingresa tu email para recuperar la contraseña' });
+      return;
+    }
+    
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setErrors({ email: 'Por favor ingresa un email válido' });
       return;
     }
 
-    setResendingEmail(true);
-    setErrors({});
-
     try {
-      const success = await resendConfirmationEmail(formData.email);
-      if (success) {
-        setErrors({ submit: 'Email de confirmación reenviado. Revisa tu bandeja de entrada.' });
-        setShowResendEmail(false);
+      const { useAuth } = await import('../hooks/useAuth');
+      const { resetPassword } = useAuth();
+      const { error } = await resetPassword(formData.email);
+      
+      if (error) {
+        setErrors({ general: 'Error al enviar email de recuperación' });
       } else {
-        setErrors({ submit: 'Error al reenviar el email. Inténtalo de nuevo.' });
+        setResetEmailSent(true);
+        setErrors({});
       }
     } catch (error) {
-      setErrors({ submit: 'Error al reenviar el email. Inténtalo de nuevo.' });
-    } finally {
-      setResendingEmail(false);
+      setErrors({ general: 'Error al enviar email de recuperación' });
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Limpiar error del campo cuando el usuario empiece a escribir
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const toggleMode = () => {
-    setIsLogin(!isLogin);
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      phone: '',
-      confirmPassword: ''
-    });
-    setErrors({});
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Verificando tu identidad en Cristo" />
+        <LoadingSpinner />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <Link to="/" className="inline-flex items-center space-x-3 mb-8">
-            <img 
-              src="/trabajo.png" 
-              alt="Iglesia Vida Nueva" 
-              className="w-12 h-12 object-contain bg-black rounded-full p-2"
-            />
-            <span className="font-semibold text-xl">Vida Nueva</span>
-          </Link>
-          
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            {isLogin ? 'Bienvenido de vuelta' : 'Únete a la familia'}
-          </h2>
-          <p className="text-gray-600">
-            {isLogin 
-              ? 'Accede a tu cuenta para continuar tu caminar espiritual'
-              : 'Crea tu cuenta y sé parte de nuestra comunidad de fe'
-            }
-          </p>
-        </div>
-
-        {/* Demo Credentials */}
-        {isLogin && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-            <h4 className="font-semibold text-blue-800 mb-2">Credenciales de prueba:</h4>
-            <div className="space-y-1 text-blue-700">
-              <div><strong>Admin:</strong> pastor@iglesiavidanueva.com / admin123</div>
-              <div><strong>Pastor:</strong> maria@iglesiavidanueva.com / pastor123</div>
-              <div><strong>Editor:</strong> carlos@iglesiavidanueva.com / editor123</div>
-              <div><strong>Miembro:</strong> ana@ejemplo.com / member123</div>
-            </div>
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              Iniciar Sesión
+            </h2>
+            <p className="text-gray-600">
+              Accede a tu cuenta para continuar
+            </p>
           </div>
-        )}
 
-        {/* Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {!isLogin && (
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre completo *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-black focus:border-black ${
-                      errors.name ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Tu nombre completo"
-                  />
-                </div>
-                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+          {/* Reset email confirmation */}
+          {resetEmailSent && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-800 text-sm">
+                Se ha enviado un email de recuperación a {formData.email}
+              </p>
+            </div>
+          )}
+
+          {/* Login Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* General Error */}
+            {errors.general && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 text-sm">{errors.general}</p>
               </div>
             )}
 
+            {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Correo electrónico *
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-black focus:border-black ${
-                    errors.email ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="tu@email.com"
-                />
-              </div>
-              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={formData.email}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                }`}
+                placeholder="tu@email.com"
+                disabled={isSubmitting}
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
             </div>
 
-            {!isLogin && (
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                  Teléfono (opcional)
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Phone className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-black"
-                    placeholder="+57 300 123 4567"
-                  />
-                </div>
-              </div>
-            )}
-
+            {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Contraseña *
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                Contraseña
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
                 <input
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-black focus:border-black ${
-                    errors.password ? 'border-red-300' : 'border-gray-300'
+                  className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
-                  placeholder="Tu contraseña"
+                  placeholder="••••••••"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  disabled={isSubmitting}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                    </svg>
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
                   )}
                 </button>
               </div>
-              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
-            </div>
-
-            {!isLogin && (
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirmar contraseña *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-black focus:border-black ${
-                      errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Confirma tu contraseña"
-                  />
-                </div>
-                {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
-              </div>
-            )}
-          </div>
-
-          {errors.submit && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{errors.submit}</p>
-              {showResendEmail && (
-                <button
-                  type="button"
-                  onClick={handleResendEmail}
-                  disabled={resendingEmail}
-                  className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
-                >
-                  {resendingEmail ? 'Reenviando...' : 'Reenviar email de confirmación'}
-                </button>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
               )}
             </div>
-          )}
 
-          <div>
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="rememberMe"
+                  name="rememberMe"
+                  type="checkbox"
+                  checked={formData.rememberMe}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  disabled={isSubmitting}
+                />
+                <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700">
+                  Recordar sesión
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+                disabled={isSubmitting}
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`btn-primary w-full flex items-center justify-center ${
-                isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
-              }`}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? (
-                <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                <div className="flex items-center">
+                  <LoadingSpinner size="sm" />
+                  <span className="ml-2">Iniciando sesión...</span>
+                </div>
               ) : (
-                <ArrowRight className="w-5 h-5 mr-2" />
+                'Iniciar Sesión'
               )}
-              {isSubmitting 
-                ? (isLogin ? 'Iniciando sesión...' : 'Creando cuenta...') 
-                : (isLogin ? 'Iniciar sesión' : 'Crear cuenta')
-              }
             </button>
-          </div>
+          </form>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={toggleMode}
-              className="text-sm text-gray-600 hover:text-black transition-colors"
-            >
-              {isLogin 
-                ? '¿No tienes cuenta? Regístrate aquí' 
-                : '¿Ya tienes cuenta? Inicia sesión'
-              }
-            </button>
-          </div>
-
-          {isLogin && (
-            <div className="text-center">
-              <Link 
-                to="/forgot-password" 
-                className="text-sm text-gray-600 hover:text-black transition-colors"
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              ¿No tienes una cuenta?{' '}
+              <Link
+                to="/register"
+                className="font-medium text-blue-600 hover:text-blue-500"
               >
-                ¿Olvidaste tu contraseña?
+                Regístrate aquí
               </Link>
-            </div>
-          )}
-        </form>
-
-        {/* Footer */}
-        <div className="text-center text-xs text-gray-500">
-          <p>Al {isLogin ? 'iniciar sesión' : 'registrarte'}, aceptas nuestros</p>
-          <div className="space-x-4 mt-1">
-            <Link to="/terminos" className="hover:text-black transition-colors">
-              Términos de Servicio
-            </Link>
-            <span>•</span>
-            <Link to="/privacidad" className="hover:text-black transition-colors">
-              Política de Privacidad
-            </Link>
+            </p>
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default LoginPage;

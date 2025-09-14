@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Settings } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { Menu, X, User, LogOut } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { user, isAuthenticated, signOut, loading } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -37,10 +37,7 @@ export function Header() {
     document.body.style.overflow = !isMenuOpen ? 'hidden' : '';
   };
 
-  const handleLogout = () => {
-    logout();
-    setShowUserMenu(false);
-  };
+
 
   return (
     <header 
@@ -94,73 +91,56 @@ export function Header() {
               </Link>
             ))}
             
-            {isAuthenticated ? (
-              <div className="relative ml-4">
-                <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 transition-colors focus-ring"
-                >
-                  <img
-                    src={user?.avatar_url || '/trabajo.png'}
-                    alt={user?.name || 'Usuario'}
-                    className="w-8 h-8 rounded-full"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.onerror = null;
-                      target.src = '/trabajo.png';
-                    }}
-                  />
-                  <span className="hidden lg:block text-sm font-medium">{user?.name}</span>
-                </button>
-                
-                {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-2 z-50">
-                    <div className="px-4 py-2 border-b">
-                      <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                      <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+            <div className="flex items-center space-x-2 ml-4">
+              <Link
+                to="/donar"
+                className="btn-primary"
+              >
+                Donacion
+              </Link>
+              
+              {/* Auth Section */}
+              {!loading && (
+                <div className="flex items-center space-x-2">
+                  {isAuthenticated ? (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowUserMenu(!showUserMenu)}
+                        className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 focus-ring"
+                      >
+                        <User className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          {user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuario'}
+                        </span>
+                      </button>
+                      
+                      {showUserMenu && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                          <button
+                            onClick={async () => {
+                              await signOut();
+                              setShowUserMenu(false);
+                            }}
+                            className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            <span>Cerrar Sesión</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
+                  ) : (
                     <Link
-                      to="/dashboard"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setShowUserMenu(false)}
+                      to="/login"
+                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus-ring"
                     >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Panel de Control
+                      <User className="w-4 h-4" />
+                      <span>Iniciar Sesión</span>
                     </Link>
-                    <Link
-                      to="/donar"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <User className="w-4 h-4 mr-2" />
-                      Donacion
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Cerrar Sesión
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2 ml-4">
-                <Link
-                  to="/login"
-                  className="btn-secondary"
-                >
-                  Iniciar Sesión
-                </Link>
-                <Link
-                  to="/donar"
-                  className="btn-primary"
-                >
-                  Donacion
-                </Link>
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* Mobile Menu Button */}
@@ -207,65 +187,56 @@ export function Header() {
           ))}
           
           <div className="pt-4 space-y-2">
-            {isAuthenticated ? (
-              <>
-                <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 rounded-lg">
-                  <img
-                    src={user?.avatar_url || 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'}
-                    alt={user?.name}
-                    className="w-10 h-10 rounded-full"
-                  />
-                  <div>
-                    <p className="font-medium">{user?.name}</p>
-                    <p className="text-sm text-gray-600 capitalize">{user?.role}</p>
+            <Link
+              to="/donar"
+              className="btn-primary w-full justify-center"
+            >
+              Donacion
+            </Link>
+            
+            {/* Mobile Auth Section */}
+            {!loading && (
+              <div className="pt-2">
+                {isAuthenticated ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-lg">
+                      <User className="w-4 h-4" />
+                      <span className="text-sm font-medium">
+                        {user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuario'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await signOut();
+                        setIsMenuOpen(false);
+                      }}
+                      className="flex items-center space-x-2 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Cerrar Sesión</span>
+                    </button>
                   </div>
-                </div>
-                <Link
-                  to="/dashboard"
-                  className="block px-4 py-3 rounded-lg text-lg hover:bg-gray-50"
-                >
-                  Panel de Control
-                </Link>
-                <Link
-                  to="/donar"
-                  className="btn-primary w-full justify-center"
-                >
-                  Donacion
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="btn-secondary w-full justify-center"
-                >
-                  Cerrar Sesión
-                </button>
-              </>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="btn-secondary w-full justify-center"
-                >
-                  Iniciar Sesión
-                </Link>
-                <Link
-                  to="/donar"
-                  className="btn-primary w-full justify-center"
-                >
-                  Sembrar
-                </Link>
-              </>
+                ) : (
+                  <Link
+                    to="/login"
+                    className="flex items-center space-x-2 w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors justify-center"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Iniciar Sesión</span>
+                  </Link>
+                )}
+              </div>
             )}
           </div>
         </nav>
       </div>
       
       {/* Overlay para cerrar menús al hacer click fuera */}
-      {(isMenuOpen || showUserMenu) && (
+      {isMenuOpen && (
         <div 
           className="fixed inset-0 z-40" 
           onClick={() => {
             setIsMenuOpen(false);
-            setShowUserMenu(false);
           }}
         />
       )}

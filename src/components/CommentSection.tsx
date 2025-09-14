@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MessageCircle, Reply, Edit, Trash2, Clock, User } from 'lucide-react';
 import { commentService } from '../services/supabaseService';
-import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../types/supabase';
 
 type Comment = Database['public']['Tables']['comments']['Row'];
@@ -18,15 +17,10 @@ interface CommentItemProps {
   onReply: (commentId: string) => void;
   onEdit: (comment: Comment) => void;
   onDelete: (commentId: string) => void;
-  canModerate: boolean;
-  currentUserId?: string;
 }
 
-function CommentItem({ comment, onReply, onEdit, onDelete, canModerate, currentUserId }: CommentItemProps) {
+function CommentItem({ comment, onReply, onEdit, onDelete }: CommentItemProps) {
   const [showActions, setShowActions] = useState(false);
-  const isAuthor = currentUserId === comment.author_id;
-  const canEdit = isAuthor || canModerate;
-  const canDelete = isAuthor || canModerate;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -129,9 +123,7 @@ export function CommentSection({ postType, postId, onCommentAdded }: CommentSect
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user, hasPermission } = useAuth();
-  
-  const canModerate = user ? hasPermission('manage_blog') || hasPermission('manage_sermons') : false;
+
 
   useEffect(() => {
     loadComments();
@@ -218,8 +210,6 @@ export function CommentSection({ postType, postId, onCommentAdded }: CommentSect
               onReply={handleReply}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              canModerate={canModerate}
-              currentUserId={user?.id}
             />
           ))}
         </div>

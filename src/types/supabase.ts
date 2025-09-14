@@ -21,7 +21,7 @@ export interface Database {
           updated_at: string
         }
         Insert: {
-          id: string
+          id?: string
           name: string
           email: string
           role?: 'admin' | 'pastor' | 'editor' | 'member'

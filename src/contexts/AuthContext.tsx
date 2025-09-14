@@ -1,256 +1,168 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { Session } from '@supabase/supabase-js';
-import { getAuthErrorMessage } from '../utils/authUtils';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'pastor' | 'editor' | 'member';
-  avatar_url?: string;
-  phone?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-// Eliminamos la interfaz UserData ya que es idéntica a User y no es necesaria
-
-interface UserMetadata {
-  name?: string;
-  role?: 'admin' | 'pastor' | 'editor' | 'member';
-  avatar_url?: string;
-  phone?: string;
-}
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (userData: RegisterData) => Promise<boolean>;
-  logout: () => void;
+  session: Session | null;
   loading: boolean;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ error: AuthError | null }>;
+  signOut: () => Promise<{ error: AuthError | null }>;
+  resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   isAuthenticated: boolean;
-  hasPermission: (permission: string) => boolean;
-  hasRole: (role: string) => boolean;
-}
-
-interface RegisterData {
-  name: string;
-  email: string;
-  password: string;
-  phone?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Ya no necesitamos los usuarios simulados, ahora usamos Supabase
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [_session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    // Verificar si hay una sesión activa en Supabase
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error getting session:', error);
+      } else {
         setSession(session);
-        setLoading(true);
-        
-        if (session?.user) {
-          // Obtener los metadatos del usuario desde Supabase
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single<User>();
+        setUser(session?.user ?? null);
+      }
+      setLoading(false);
+    };
 
-          if (userData && !error) {
-            setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: userData.name || '',
-            role: userData.role || 'member',
-            avatar_url: userData.avatar_url,
-            phone: userData.phone,
-            created_at: userData.created_at || new Date().toISOString(),
-            updated_at: userData.updated_at || new Date().toISOString()
-          });
-          } else {
-            // Si no hay datos en la tabla users, crear un usuario básico
-            const userMetadata = session.user.user_metadata as UserMetadata;
-            setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: userMetadata.name || '',
-            role: userMetadata.role || 'member',
-            avatar_url: userMetadata.avatar_url,
-            phone: userMetadata.phone,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-          }
-        } else {
-          setUser(null);
-        }
-        
+    getInitialSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session);
+        setSession(session);
+        setUser(session?.user ?? null);
         setLoading(false);
       }
     );
 
-    // Cargar la sesión inicial
-    const loadInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      
-      if (session?.user) {
-        // Obtener los metadatos del usuario desde Supabase
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single<User>();
-
-        if (userData && !error) {
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: userData.name || '',
-            role: userData.role || 'member',
-            avatar_url: userData.avatar_url,
-            phone: userData.phone,
-            created_at: userData.created_at || new Date().toISOString(),
-            updated_at: userData.updated_at || new Date().toISOString()
-          });
-        } else {
-          // Si no hay datos en la tabla users, crear un usuario básico
-          const userMetadata = session.user.user_metadata as UserMetadata;
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: userMetadata.name || '',
-            role: userMetadata.role || 'member',
-            avatar_url: userMetadata.avatar_url,
-            phone: userMetadata.phone,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-        }
-      }
-      
-      setLoading(false);
-    };
-    
-    loadInitialSession();
-    
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setLoading(true);
-    
+  const signIn = async (email: string, password: string, rememberMe = false) => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
+        options: {
+          // Set session persistence based on rememberMe
+          ...(rememberMe && { 
+            data: { remember_me: true }
+          })
+        }
       });
       
       if (error) {
-        console.error('Error de inicio de sesión:', error.message);
-        setLoading(false);
-        
-        // Usar utilidad para obtener mensaje de error amigable
-        throw new Error(getAuthErrorMessage(error));
+        console.error('Sign in error:', error);
+        return { error };
       }
       
-      // El usuario se establece a través del listener de onAuthStateChange
+      return { error: null };
+    } catch (error) {
+      console.error('Unexpected sign in error:', error);
+      return { error: error as AuthError };
+    } finally {
       setLoading(false);
-      return true;
-    } catch (error: any) {
-      console.error('Error inesperado durante el inicio de sesión:', error);
-      setLoading(false);
-      throw error; // Re-lanzar el error para que pueda ser capturado en LoginPage
     }
   };
 
-  const register = async (userData: RegisterData): Promise<boolean> => {
-    setLoading(true);
-    
+  const signUp = async (email: string, password: string, name: string) => {
     try {
-      // Registrar el usuario en Supabase Auth
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
+      setLoading(true);
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
         options: {
           data: {
-            name: userData.name,
-            role: 'member',
-            phone: userData.phone
+            name: name,
           }
         }
       });
       
-      if (signUpError) {
-        console.error('Error al registrar usuario:', signUpError.message);
-        setLoading(false);
-        
-        // Usar utilidad para obtener mensaje de error amigable
-        throw new Error(getAuthErrorMessage(signUpError));
+      if (error) {
+        console.error('Sign up error:', error);
+        return { error };
       }
       
-      // El perfil de usuario se crea automáticamente mediante el trigger handle_new_user
-      // No es necesario insertar manualmente en la tabla users
+      return { error: null };
+    } catch (error) {
+      console.error('Unexpected sign up error:', error);
+      return { error: error as AuthError };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
       
-      // El usuario se establece a través del listener de onAuthStateChange
+      if (error) {
+        console.error('Sign out error:', error);
+        return { error };
+      }
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Unexpected sign out error:', error);
+      return { error: error as AuthError };
+    } finally {
       setLoading(false);
-      return true;
-    } catch (error: any) {
-      console.error('Error inesperado durante el registro:', error);
-      setLoading(false);
-      throw error; // Re-lanzar el error para que pueda ser capturado en LoginPage
     }
   };
 
-  const logout = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Error al cerrar sesión:', error.message);
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        console.error('Reset password error:', error);
+        return { error };
+      }
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Unexpected reset password error:', error);
+      return { error: error as AuthError };
     }
-    setUser(null);
-    setSession(null);
-    setLoading(false);
-  };
-
-  const hasPermission = (permission: string): boolean => {
-    if (!user) return false;
-    
-    // Definir permisos basados en roles
-    const rolePermissions = {
-      admin: ['read', 'write', 'delete', 'manage_users', 'manage_events', 'manage_sermons', 'manage_blog'],
-      pastor: ['read', 'write', 'manage_events', 'manage_sermons', 'manage_blog'],
-      editor: ['read', 'write', 'manage_blog'],
-      member: ['read']
-    };
-    
-    return rolePermissions[user.role]?.includes(permission) || false;
-  };
-
-  const hasRole = (role: string): boolean => {
-    return user?.role === role;
   };
 
   const value: AuthContextType = {
     user,
-    login,
-    register,
-    logout,
+    session,
     loading,
+    signIn,
+    signUp,
+    signOut,
+    resetPassword,
     isAuthenticated: !!user,
-    hasPermission,
-    hasRole
   };
 
   return (
@@ -258,12 +170,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+export default AuthContext;

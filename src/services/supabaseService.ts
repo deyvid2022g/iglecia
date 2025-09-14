@@ -24,6 +24,37 @@ type CommentUpdate = Database['public']['Tables']['comments']['Update'];
 
 // Servicios para usuarios
 export const userService = {
+  // Leer todas las filas
+  async getAllUsers() {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*');
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Leer columnas específicas
+  async getUsersWithColumns(columns: string) {
+    const { data, error } = await supabase
+      .from('users')
+      .select(columns);
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Con paginación
+  async getUsersWithPagination(start: number, end: number) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .range(start, end);
+    
+    if (error) throw error;
+    return data;
+  },
+
   // Obtener un usuario por ID
   async getUserById(userId: string) {
     const { data, error } = await supabase
@@ -35,16 +66,204 @@ export const userService = {
     if (error) throw error;
     return data;
   },
-  
+
+  // Filtrado avanzado
+  async getUsersWithFilters(filters: {
+    email?: string;
+    role?: string;
+    nameContains?: string;
+    createdAfter?: string;
+  }) {
+    let query = supabase.from('users').select('*');
+
+    if (filters.email) {
+      query = query.eq('email', filters.email);
+    }
+    if (filters.role) {
+      query = query.eq('role', filters.role);
+    }
+    if (filters.nameContains) {
+      query = query.ilike('name', `%${filters.nameContains}%`);
+    }
+    if (filters.createdAfter) {
+      query = query.gte('created_at', filters.createdAfter);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  },
+
+  // Buscar usuarios por múltiples roles
+  async getUsersByRoles(roles: string[]) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .in('role', roles);
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Insertar una fila
+  async createUser(userData: UserInsert) {
+    const { data, error } = await supabase
+      .from('users')
+      .insert([userData])
+      .select();
+    
+    if (error) throw error;
+    return data[0];
+  },
+
+  // Insertar múltiples filas
+  async createMultipleUsers(usersData: UserInsert[]) {
+    const { data, error } = await supabase
+      .from('users')
+      .insert(usersData)
+      .select();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Upsert (insertar o actualizar)
+  async upsertUser(userData: UserInsert) {
+    const { data, error } = await supabase
+      .from('users')
+      .upsert(userData)
+      .select();
+    
+    if (error) throw error;
+    return data[0];
+  },
+
   // Actualizar un usuario
   async updateUser(userId: string, userData: UserUpdate) {
     const { data, error } = await supabase
       .from('users')
-      .update<UserUpdate>(userData)
-      .eq('id', userId);
+      .update(userData)
+      .eq('id', userId)
+      .select();
+    
+    if (error) throw error;
+    return data[0];
+  },
+
+  // Actualizar múltiples usuarios por filtro
+  async updateUsersByRole(role: string, userData: UserUpdate) {
+    const { data, error } = await supabase
+      .from('users')
+      .update(userData)
+      .eq('role', role)
+      .select();
     
     if (error) throw error;
     return data;
+  },
+
+  // Eliminar un usuario
+  async deleteUser(userId: string) {
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId);
+    
+    if (error) throw error;
+    return true;
+  },
+
+  // Eliminar usuarios por filtro
+  async deleteUsersByRole(role: string) {
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('role', role);
+    
+    if (error) throw error;
+    return true;
+  },
+
+  // Suscribirse a todos los cambios
+  subscribeToAllChanges(callback: (payload: any) => void) {
+    return supabase
+      .channel('custom-all-users-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'users' },
+        callback
+      )
+      .subscribe();
+  },
+
+  // Suscribirse a inserciones
+  subscribeToInserts(callback: (payload: any) => void) {
+    return supabase
+      .channel('custom-insert-users-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'users' },
+        callback
+      )
+      .subscribe();
+  },
+
+  // Suscribirse a actualizaciones
+  subscribeToUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('custom-update-users-channel')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users' },
+        callback
+      )
+      .subscribe();
+  },
+
+  // Suscribirse a eliminaciones
+  subscribeToDeletes(callback: (payload: any) => void) {
+    return supabase
+      .channel('custom-delete-users-channel')
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'users' },
+        callback
+      )
+      .subscribe();
+  },
+
+  // Suscribirse a filas específicas
+  subscribeToSpecificUser(userId: string, callback: (payload: any) => void) {
+    return supabase
+      .channel('custom-filter-users-channel')
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'users', 
+          filter: `id=eq.${userId}` 
+        },
+        callback
+      )
+      .subscribe();
+  },
+
+  // Suscribirse a usuarios por rol
+  subscribeToUsersByRole(role: string, callback: (payload: any) => void) {
+    return supabase
+      .channel('custom-role-users-channel')
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'users', 
+          filter: `role=eq.${role}` 
+        },
+        callback
+      )
+      .subscribe();
   },
 };
 

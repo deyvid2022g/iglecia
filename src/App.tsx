@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
-import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { EventsPage } from './pages/EventsPage';
 import { SermonsPage } from './pages/PredicasPage';
@@ -11,12 +11,12 @@ import { BlogPage } from './pages/BlogPage';
 import { DonatePage } from './pages/DonatePage';
 import { ContactPage } from './pages/ContactPage';
 import { AboutPage } from './pages/AboutPage';
-import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
 import { AgeGroupPage } from './pages/AgeGroupPage';
 import { SermonDetailPage } from './pages/PredicaDetailPage';
 import { EventDetailPage } from './pages/EventDetailPage';
 import { BlogPostPage } from './pages/BlogPostPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import './index.css';
 
 function App() {
@@ -27,6 +27,7 @@ function App() {
           <Header />
           <main role="main">
             <Routes>
+              {/* Public routes */}
               <Route path="/" element={<HomePage />} />
               <Route path="/eventos" element={<EventsPage />} />
               <Route path="/eventos/:slug" element={<EventDetailPage />} />
@@ -38,12 +39,21 @@ function App() {
               <Route path="/contacto" element={<ContactPage />} />
               <Route path="/nosotros" element={<AboutPage />} />
               <Route path="/grupos/:ageGroup" element={<AgeGroupPage />} />
-              <Route path="/login" element={<LoginPage />} />
+              
+              {/* Auth routes - redirect if already authenticated */}
               <Route 
-                path="/dashboard" 
+                path="/login" 
                 element={
-                  <ProtectedRoute>
-                    <DashboardPage />
+                  <ProtectedRoute requireAuth={false}>
+                    <LoginPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/register" 
+                element={
+                  <ProtectedRoute requireAuth={false}>
+                    <RegisterPage />
                   </ProtectedRoute>
                 } 
               />
