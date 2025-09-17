@@ -16,6 +16,17 @@ export function Header() {
     setShowUserMenu(false);
   };
 
+  // Función para determinar si el usuario es administrador
+  const isAdmin = () => {
+    if (!user) return false;
+    return user.email?.includes('admin') || user.email === 'camplaygo@gmail.com';
+  };
+
+  // Función para obtener el rol del usuario
+  const getUserRole = () => {
+    return isAdmin() ? 'Admin' : 'Usuario';
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
@@ -106,35 +117,35 @@ export function Header() {
                 </button>
                 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-2 z-50">
-                    <div className="px-4 py-2 border-b">
-                      <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-                      <p className="text-xs text-gray-500">Usuario</p>
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border py-2 z-50">
+                    <div className="px-4 py-3 border-b">
+                      <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
+                      <p className="text-xs text-gray-500">{getUserRole()}</p>
                     </div>
-                    {user?.email?.includes('admin') || user?.email === 'camplaygo@gmail.com' ? (
+                    {isAdmin() ? (
                       <Link
                         to="/dashboard"
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                         onClick={() => setShowUserMenu(false)}
                       >
-                        <Settings className="w-4 h-4 mr-2" />
-                        Panel de Control
+                        <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
+                        <span>Panel de Control</span>
                       </Link>
                     ) : null}
                     <Link
                       to="/donar"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      <User className="w-4 h-4 mr-2" />
-                      Donacion
+                      <User className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span>Donación</span>
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Cerrar Sesión
+                      <LogOut className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span>Cerrar Sesión</span>
                     </button>
                   </div>
                 )}
@@ -211,7 +222,7 @@ export function Header() {
                   />
                   <div>
                     <p className="font-medium">{user?.email}</p>
-                    <p className="text-sm text-gray-600">Usuario</p>
+                    <p className="text-sm text-gray-600">{getUserRole()}</p>
                   </div>
                 </div>
                 <Link
