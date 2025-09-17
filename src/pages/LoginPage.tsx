@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
+import { useAuth } from '../contexts/SupabaseAuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight } from 'lucide-react';
 
@@ -17,7 +17,7 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { signIn, signUp, loading, user } = useSupabaseAuth();
+  const { signIn, signUp, loading, user } = useAuth();
   const isAuthenticated = !!user;
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,7 +77,9 @@ export function LoginPage() {
       } else {
         const { error } = await signUp(formData.email, formData.password, {
           full_name: formData.name,
-          phone: formData.phone
+          name: formData.name,
+          phone: formData.phone,
+          role: 'member'
         });
         if (error) {
           setErrors({ submit: error.message || 'Error al registrar usuario.' });
@@ -148,18 +150,7 @@ export function LoginPage() {
           </p>
         </div>
 
-        {/* Demo Credentials */}
-        {isLogin && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-            <h4 className="font-semibold text-blue-800 mb-2">Credenciales de prueba:</h4>
-            <div className="space-y-1 text-blue-700">
-              <div><strong>Admin:</strong> pastor@iglesiavidanueva.com / admin123</div>
-              <div><strong>Pastor:</strong> maria@iglesiavidanueva.com / pastor123</div>
-              <div><strong>Editor:</strong> carlos@iglesiavidanueva.com / editor123</div>
-              <div><strong>Miembro:</strong> ana@ejemplo.com / member123</div>
-            </div>
-          </div>
-        )}
+
 
         {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -177,6 +168,7 @@ export function LoginPage() {
                     id="name"
                     name="name"
                     type="text"
+                    autoComplete="name"
                     value={formData.name}
                     onChange={handleInputChange}
                     className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-black focus:border-black ${
@@ -201,6 +193,7 @@ export function LoginPage() {
                   id="email"
                   name="email"
                   type="email"
+                  autoComplete="email"
                   value={formData.email}
                   onChange={handleInputChange}
                   className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-black focus:border-black ${
@@ -225,6 +218,7 @@ export function LoginPage() {
                     id="phone"
                     name="phone"
                     type="tel"
+                    autoComplete="tel"
                     value={formData.phone}
                     onChange={handleInputChange}
                     className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-black"
@@ -246,6 +240,7 @@ export function LoginPage() {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete={isLogin ? "current-password" : "new-password"}
                   value={formData.password}
                   onChange={handleInputChange}
                   className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-black focus:border-black ${
@@ -281,6 +276,7 @@ export function LoginPage() {
                     id="confirmPassword"
                     name="confirmPassword"
                     type="password"
+                    autoComplete="new-password"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
                     className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-black focus:border-black ${

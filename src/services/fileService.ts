@@ -1,6 +1,9 @@
-import { supabase } from '../lib/supabase';
+// Servicio de archivos local
+import { localData } from '../lib/localData';
 import { resizeImage } from './utilsService';
 import { validateFile } from './validationService';
+import { supabase } from '../lib/supabase';
+import { useState } from 'react';
 
 // Tipos para el servicio de archivos
 export interface UploadOptions {
@@ -128,30 +131,23 @@ export const uploadFile = async (
 
     onProgress?.(50);
 
-    // Subir archivo a Supabase Storage
-    const { data: _, error } = await supabase.storage
-      .from(options.bucket)
-      .upload(filePath, fileToUpload, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    // Simulación de carga de archivo usando el sistema local
+    const result = await localData.uploadFile(filePath, fileToUpload);
 
-    if (error) {
-      throw error;
+    if (!result) {
+      throw new Error('Error al subir el archivo');
     }
 
     onProgress?.(80);
 
-    // Obtener URL pública del archivo
-    const { data: urlData } = supabase.storage
-      .from(options.bucket)
-      .getPublicUrl(filePath);
+    // Generar URL local simulada
+    const fileUrl = `${window.location.origin}/files/${filePath}`;
 
     onProgress?.(100);
 
     return {
       success: true,
-      url: urlData.publicUrl,
+      url: fileUrl,
       path: filePath
     };
 
@@ -275,7 +271,7 @@ export const createBucketsIfNotExist = async () => {
   for (const bucketName of buckets) {
     try {
       const { data: existingBuckets } = await supabase.storage.listBuckets();
-      const bucketExists = existingBuckets?.some(bucket => bucket.name === bucketName);
+      const bucketExists = existingBuckets?.some((bucket: { name: string }) => bucket.name === bucketName);
       
       if (!bucketExists) {
         await supabase.storage.createBucket(bucketName, {
@@ -427,7 +423,10 @@ export const optimizeImage = async (
 
       // Convertir a blob con formato y calidad especificados
       const mimeType = format === 'webp' ? 'image/webp' : 'image/jpeg';
-      canvas.toBlob(resolve, mimeType, quality);
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else resolve(new Blob([], { type: mimeType }));
+      }, mimeType, quality);
     };
 
     img.src = URL.createObjectURL(file);

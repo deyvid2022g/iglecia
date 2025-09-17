@@ -80,9 +80,43 @@ class LocalDataService {
   private readonly MINISTRIES_KEY = 'iglesia_ministries';
   private readonly SERMONS_KEY = 'iglesia_sermons';
   private readonly TESTIMONIES_KEY = 'iglesia_testimonies';
+  private readonly FILES_KEY = 'iglesia_files';
 
   constructor() {
     this.initializeDefaultData();
+    
+    // Inicializar almacenamiento de archivos si no existe
+    if (!localStorage.getItem(this.FILES_KEY)) {
+      localStorage.setItem(this.FILES_KEY, JSON.stringify({}));
+    }
+  }
+  
+  // Método para subir archivos (simulado)
+  public uploadFile(filePath: string, _file: File | Blob): Promise<boolean> {
+    return new Promise((resolve) => {
+      // Simulamos la carga del archivo
+      setTimeout(() => {
+        try {
+          // Obtenemos los archivos existentes
+          const files = JSON.parse(localStorage.getItem(this.FILES_KEY) || '{}');
+          
+          // Agregamos el nuevo archivo (solo guardamos la ruta, no el contenido real)
+          files[filePath] = {
+            path: filePath,
+            name: filePath.split('/').pop(),
+            created_at: new Date().toISOString()
+          };
+          
+          // Guardamos en localStorage
+          localStorage.setItem(this.FILES_KEY, JSON.stringify(files));
+          
+          resolve(true);
+        } catch (error) {
+          console.error('Error al guardar archivo:', error);
+          resolve(false);
+        }
+      }, 500); // Simulamos un retraso de 500ms
+    });
   }
 
   private initializeDefaultData() {
@@ -435,9 +469,5 @@ export const localData = new LocalDataService();
 
 // Tipos exportados para compatibilidad
 export type {
-  BlogPost as Post,
-  Event,
-  Ministry,
-  Sermon,
-  Testimony
+  BlogPost as Post
 };

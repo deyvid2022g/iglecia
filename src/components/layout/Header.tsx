@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, User, LogOut, Settings } from 'lucide-react';
-import { useSupabaseAuth } from '../../contexts/SupabaseAuthContext';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { AnimatedLogo } from '../AnimatedLogo';
 
 export function Header() {
@@ -9,7 +9,7 @@ export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
-  const { user, profile, signOut } = useSupabaseAuth();
+  const { user, signOut } = useAuth();
   
   const handleLogout = async () => {
     await signOut();
@@ -86,39 +86,41 @@ export function Header() {
               </Link>
             ))}
             
-            {user && profile ? (
+            {user ? (
               <div className="relative ml-4">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 transition-colors focus-ring"
                 >
                   <img
-                    src={profile.avatar_url || user.user_metadata?.avatar_url || '/default-avatar.png'}
-                alt={user?.name || 'Usuario'}
+                    src="/default-avatar.svg"
+                    alt="Usuario"
                     className="w-8 h-8 rounded-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.onerror = null;
-                      target.src = '/default-avatar.png';
+                      target.src = '/default-avatar.svg';
                     }}
                   />
-                  <span className="hidden lg:block text-sm font-medium">{profile.full_name || user.user_metadata?.name || user.email}</span>
+                  <span className="hidden lg:block text-sm font-medium">{user?.email}</span>
                 </button>
                 
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-2 z-50">
                     <div className="px-4 py-2 border-b">
-                      <p className="text-sm font-medium text-gray-900">{profile.full_name || user.user_metadata?.name || user.email}</p>
-              <p className="text-xs text-gray-500 capitalize">{profile.role}</p>
+                      <p className="text-sm font-medium text-gray-900">{user?.email}</p>
+                      <p className="text-xs text-gray-500">Usuario</p>
                     </div>
-                    <Link
-                      to="/dashboard"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Panel de Control
-                    </Link>
+                    {user?.email?.includes('admin') || user?.email === 'camplaygo@gmail.com' ? (
+                      <Link
+                        to="/dashboard"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        Panel de Control
+                      </Link>
+                    ) : null}
                     <Link
                       to="/donar"
                       className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -199,17 +201,17 @@ export function Header() {
           ))}
           
           <div className="pt-4 space-y-2">
-            {user && profile ? (
+            {user ? (
               <>
                 <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 rounded-lg">
                   <img
-                    src={profile.avatar_url || user.user_metadata?.avatar_url || '/default-avatar.png'}
-                    alt={profile.full_name || user.user_metadata?.name || 'Usuario'}
+                    src="/default-avatar.svg"
+                    alt="Usuario"
                     className="w-10 h-10 rounded-full object-cover"
                   />
                   <div>
-                    <p className="font-medium">{profile.full_name || user.user_metadata?.name || user.email}</p>
-                    <p className="text-sm text-gray-600 capitalize">{profile.role}</p>
+                    <p className="font-medium">{user?.email}</p>
+                    <p className="text-sm text-gray-600">Usuario</p>
                   </div>
                 </div>
                 <Link
