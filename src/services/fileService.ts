@@ -1,9 +1,8 @@
-// Servicio de archivos local
-import { localData } from '../lib/localData';
+// Servicio de archivos con Supabase
+import { useState } from 'react';
 import { resizeImage } from './utilsService';
 import { validateFile } from './validationService';
 import { supabase } from '../lib/supabase';
-import { useState } from 'react';
 
 // Tipos para el servicio de archivos
 export interface UploadOptions {
@@ -131,23 +130,30 @@ export const uploadFile = async (
 
     onProgress?.(50);
 
-    // Simulación de carga de archivo usando el sistema local
-    const result = await localData.uploadFile(filePath, fileToUpload);
+    // Subir archivo a Supabase Storage
+    const { error } = await supabase.storage
+      .from(options.bucket)
+      .upload(filePath, fileToUpload, {
+        cacheControl: '3600',
+        upsert: false
+      });
 
-    if (!result) {
-      throw new Error('Error al subir el archivo');
+    if (error) {
+      throw new Error(`Error al subir archivo: ${error.message}`);
     }
 
     onProgress?.(80);
 
-    // Generar URL local simulada
-    const fileUrl = `${window.location.origin}/files/${filePath}`;
+    // Obtener URL pública del archivo
+    const { data: { publicUrl } } = supabase.storage
+      .from(options.bucket)
+      .getPublicUrl(filePath);
 
     onProgress?.(100);
 
     return {
       success: true,
-      url: fileUrl,
+      url: publicUrl,
       path: filePath
     };
 

@@ -273,7 +273,7 @@ export function BlogPostPage() {
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="flex flex-wrap gap-2">
-                  {post.tags.map((tag) => (
+                  {post.tags.map((tag: string) => (
                     <span
                       key={tag}
                       className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
@@ -367,7 +367,7 @@ export function BlogPostPage() {
           <section className="mt-12">
             <h2 className="text-2xl font-bold mb-8">Artículos relacionados</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {relatedPosts.map((relatedPost) => (
+              {relatedPosts.map((relatedPost: any) => (
                 <article key={relatedPost.id} className="card group">
                   <div className="aspect-video rounded-lg overflow-hidden mb-4">
                     <img
@@ -403,7 +403,7 @@ export function BlogPostPage() {
             
             {showComments ? (
               <div className="space-y-6">
-                {comments.map((comment) => (
+                {comments.map((comment: Comment) => (
                   <div key={comment.id} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
                       <div className="font-medium">{comment.author}</div>

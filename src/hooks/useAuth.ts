@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react'
-import { localAuth, type LocalUser as User, type LocalSession as Session } from '../lib/localAuth'
+import { supabase } from '../lib/supabase'
+import { Database } from '../types/database'
 import { logError, AppError } from '../lib/errors'
 
-// Tipo Profile compatible con el sistema local
+// Tipos de Supabase
+type User = Database['public']['Tables']['profiles']['Row']
+type Session = any // Tipo de sesión de Supabase
+
+// Tipo Profile compatible con Supabase
 export interface Profile {
   id: string
   full_name: string
@@ -39,7 +44,7 @@ export interface AuthActions {
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: AppError | null }>
 }
 
-// Función para convertir LocalUser a Profile
+// Función para convertir User de Supabase a Profile
 function userToProfile(user: User): Profile {
   return {
     id: user.id,
@@ -50,7 +55,7 @@ function userToProfile(user: User): Profile {
     phone: user.phone,
     bio: user.bio,
     created_at: user.created_at,
-    updated_at: user.last_login
+    updated_at: user.updated_at
   }
 }
 
@@ -62,15 +67,25 @@ export const useAuth = (): AuthState & AuthActions => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Obtener sesión inicial del sistema local
+    // Obtener sesión inicial de Supabase
     const getInitialSession = async () => {
       try {
-        const currentSession = localAuth.getSession()
+        const { data: { session } } = await supabase.auth.getSession()
         
-        if (currentSession) {
-          setSession(currentSession)
-          setUser(currentSession.user)
-          setProfile(userToProfile(currentSession.user))
+        if (session) {
+          setSession(session)
+          
+          // Obtener perfil del usuario
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+          
+          if (error) throw error
+          
+          setUser(profile)
+          setProfile(userToProfile(profile))
         }
       } catch (err) {
         const appError = new AppError('Error al obtener la sesión', 500, true, { action: 'getInitialSession' })
@@ -83,19 +98,31 @@ export const useAuth = (): AuthState & AuthActions => {
 
     getInitialSession()
 
-    // Verificar sesión periódicamente (cada 5 minutos)
-    const interval = setInterval(() => {
-      const currentSession = localAuth.getSession()
-      if (!currentSession && user) {
-        // Sesión expirada
+    // Escuchar cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setSession(session)
+        
+        // Obtener perfil del usuario
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        
+        if (!error && profile) {
+          setUser(profile)
+          setProfile(userToProfile(profile))
+        }
+      } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setProfile(null)
         setSession(null)
       }
-    }, 5 * 60 * 1000)
+    })
 
     return () => {
-      clearInterval(interval)
+      subscription.unsubscribe()
     }
   }, [])
 
@@ -104,13 +131,26 @@ export const useAuth = (): AuthState & AuthActions => {
       setLoading(true)
       setError(null)
       
-      const result = await localAuth.signIn(email, password)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
       
-      if (result) {
-        setUser(result.user)
-        setSession(result.session)
-        setProfile(userToProfile(result.user))
-        return { error: null }
+      if (error) throw error
+      
+      if (data.user) {
+        // Obtener perfil del usuario
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single()
+        
+        if (profileError) throw profileError
+        
+        setUser(profile)
+        setSession(data.session)
+        setProfile(userToProfile(profile))
       }
       
       return { error: null }
@@ -129,11 +169,34 @@ export const useAuth = (): AuthState & AuthActions => {
       setLoading(true)
       setError(null)
       
-      const result = await localAuth.signUp(email, password, userData.full_name)
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: userData.full_name,
+            phone: userData.phone
+          }
+        }
+      })
       
-      setUser(result.user)
-      setSession(result.session)
-      setProfile(userToProfile(result.user))
+      if (error) throw error
+      
+      if (data.user) {
+        // El perfil se creará automáticamente por el trigger de la base de datos
+        // Intentar obtener el perfil
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single()
+        
+        if (!profileError && profile) {
+          setUser(profile)
+          setSession(data.session)
+          setProfile(userToProfile(profile))
+        }
+      }
       
       return { error: null }
     } catch (err: any) {
@@ -151,7 +214,9 @@ export const useAuth = (): AuthState & AuthActions => {
       setLoading(true)
       setError(null)
       
-      localAuth.signOut()
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) throw error
       
       setUser(null)
       setSession(null)
@@ -172,7 +237,9 @@ export const useAuth = (): AuthState & AuthActions => {
     try {
       setError(null)
       
-      await localAuth.resetPassword(email)
+      const { error } = await supabase.auth.resetPasswordForEmail(email)
+      
+      if (error) throw error
       
       return { error: null }
     } catch (err: any) {
@@ -194,18 +261,23 @@ export const useAuth = (): AuthState & AuthActions => {
         return { error: appError }
       }
       
-      // Convertir updates de Profile a LocalUser
-      const userUpdates: Partial<User> = {
-        full_name: updates.full_name,
-        avatar_url: updates.avatar_url,
-        phone: updates.phone,
-        bio: updates.bio
-      }
+      // Actualizar perfil en Supabase
+      const { data: updatedProfile, error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: updates.full_name,
+          avatar_url: updates.avatar_url,
+          phone: updates.phone,
+          bio: updates.bio
+        })
+        .eq('id', user.id)
+        .select()
+        .single()
       
-      const updatedUser = await localAuth.updateProfile(user.id, userUpdates)
+      if (error) throw error
       
-      setUser(updatedUser)
-      setProfile(userToProfile(updatedUser))
+      setUser(updatedProfile)
+      setProfile(userToProfile(updatedProfile))
       
       return { error: null }
     } catch (err: any) {

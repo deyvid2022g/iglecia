@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
-import { type Sermon } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
+import { type Sermon } from '../services/sermonService'
 import { useAuth } from './useAuth'
+
+// Re-export Sermon type for external use
+export { type Sermon } from '../services/sermonService'
 
 export interface SermonsState {
   sermons: Sermon[]
   loading: boolean
   error: string | null
+  hasMore: boolean
 }
 
 export interface SermonsActions {
@@ -16,83 +21,13 @@ export interface SermonsActions {
   incrementViewCount: (id: string) => Promise<{ error: Error | null }>
   toggleLike: (sermonId: string) => Promise<{ error: Error | null }>
   refreshSermons: () => Promise<void>
+  fetchSermons: () => Promise<void>
+  searchSermons: (query: string) => Promise<void>
+  loadMore: () => Promise<void>
 }
 
 // Datos mock para sermones
-const getDefaultSermons = (): Sermon[] => [
-  {
-    id: '1',
-    slug: 'la-gracia-de-dios',
-    title: 'La Gracia de Dios',
-    description: 'Un mensaje sobre la gracia infinita de Dios hacia nosotros',
-    speaker: 'Pastor Juan Pérez',
-    sermon_date: '2024-01-15',
-    duration: '45:30',
-    thumbnail_url: '/images/sermons/gracia-dios.jpg',
-    video_url: 'https://example.com/video1',
-    audio_url: 'https://example.com/audio1',
-    transcript: null,
-    has_transcript: false,
-    view_count: 125,
-    like_count: 23,
-    comment_count: 8,
-    tags: ['gracia', 'salvación', 'amor'],
-    category_id: 'cat1',
-    is_published: true,
-    featured: true,
-    created_by: 'user1',
-    created_at: '2024-01-15T10:00:00Z',
-    updated_at: '2024-01-15T10:00:00Z'
-  },
-  {
-    id: '2',
-    slug: 'el-poder-de-la-oracion',
-    title: 'El Poder de la Oración',
-    description: 'Descubriendo el poder transformador de la oración en nuestras vidas',
-    speaker: 'Pastora María González',
-    sermon_date: '2024-01-08',
-    duration: '38:15',
-    thumbnail_url: '/images/sermons/poder-oracion.jpg',
-    video_url: 'https://example.com/video2',
-    audio_url: 'https://example.com/audio2',
-    transcript: null,
-    has_transcript: false,
-    view_count: 89,
-    like_count: 15,
-    comment_count: 5,
-    tags: ['oración', 'fe', 'poder'],
-    category_id: 'cat2',
-    is_published: true,
-    featured: false,
-    created_by: 'user2',
-    created_at: '2024-01-08T10:00:00Z',
-    updated_at: '2024-01-08T10:00:00Z'
-  },
-  {
-    id: '3',
-    slug: 'viviendo-en-comunidad',
-    title: 'Viviendo en Comunidad',
-    description: 'La importancia de la comunidad cristiana en nuestro crecimiento espiritual',
-    speaker: 'Pastor Carlos Rodríguez',
-    sermon_date: '2024-01-01',
-    duration: '42:20',
-    thumbnail_url: '/images/sermons/comunidad.jpg',
-    video_url: 'https://example.com/video3',
-    audio_url: 'https://example.com/audio3',
-    transcript: null,
-    has_transcript: false,
-    view_count: 156,
-    like_count: 31,
-    comment_count: 12,
-    tags: ['comunidad', 'iglesia', 'crecimiento'],
-    category_id: 'cat1',
-    is_published: true,
-    featured: true,
-    created_by: 'user3',
-    created_at: '2024-01-01T10:00:00Z',
-    updated_at: '2024-01-01T10:00:00Z'
-  }
-]
+const getDefaultSermons = (): Sermon[] => []
 
 export const useSermons = (options?: {
   published?: boolean
@@ -104,6 +39,7 @@ export const useSermons = (options?: {
   const [sermons, setSermons] = useState<Sermon[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
   const { user } = useAuth()
 
   const fetchSermons = useCallback(async () => {
@@ -131,7 +67,7 @@ export const useSermons = (options?: {
       }
 
       if (options?.speaker) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.speaker === options.speaker)
+        filteredSermons = filteredSermons.filter(sermon => sermon.preacher === options.speaker)
       }
 
       if (options?.category) {
@@ -139,11 +75,11 @@ export const useSermons = (options?: {
       }
 
       if (options?.featured !== undefined) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.featured === options.featured)
+        filteredSermons = filteredSermons.filter(sermon => sermon.is_featured === options.featured)
       }
 
       // Ordenar por fecha de sermón (más reciente primero)
-      filteredSermons.sort((a, b) => new Date(b.sermon_date).getTime() - new Date(a.sermon_date).getTime())
+      filteredSermons.sort((a, b) => new Date(b.preached_at).getTime() - new Date(a.preached_at).getTime())
 
       // Aplicar límite
       if (options?.limit) {
@@ -163,6 +99,36 @@ export const useSermons = (options?: {
     fetchSermons()
   }, [fetchSermons, options?.published, options?.limit, options?.speaker, options?.category, options?.featured])
 
+  // Subscribe to real-time changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('sermons_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'sermons' },
+        (payload) => {
+          console.log('Sermons change received:', payload);
+          // Handle different types of changes
+          if (payload.eventType === 'INSERT' && payload.new) {
+            setSermons(prev => [payload.new as Sermon, ...prev]);
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            setSermons(prev => prev.map(sermon => 
+              sermon.id === payload.new.id ? payload.new as Sermon : sermon
+            ));
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            setSermons(prev => prev.filter(sermon => sermon.id !== payload.old.id));
+          } else {
+            // Fallback: refresh all data
+            fetchSermons();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchSermons]);
+
   const createSermon = async (sermonData: Omit<Sermon, 'id' | 'created_at' | 'updated_at' | 'view_count' | 'like_count' | 'comment_count'>) => {
     try {
       // Simular delay de red
@@ -171,7 +137,6 @@ export const useSermons = (options?: {
       const newSermon: Sermon = {
         ...sermonData,
         id: Date.now().toString(),
-        created_by: user?.id || 'anonymous',
         view_count: 0,
         like_count: 0,
         comment_count: 0,
@@ -251,29 +216,6 @@ export const useSermons = (options?: {
     } catch (err) {
       console.error('Error deleting sermon:', err)
       return { error: err as Error }
-    }
-  }
-
-  const getSermonBySlug = async (slug: string) => {
-    try {
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Obtener sermones del localStorage
-      const storedSermons = localStorage.getItem('sermons')
-      const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Buscar el sermón por slug
-      const sermon = existingSermons.find(s => s.slug === slug)
-      
-      if (!sermon) {
-        throw new Error('Sermón no encontrado')
-      }
-
-      return { data: sermon, error: null }
-    } catch (err) {
-      console.error('Error getting sermon by slug:', err)
-      return { data: null, error: err }
     }
   }
 
@@ -366,17 +308,152 @@ export const useSermons = (options?: {
     await fetchSermons()
   }
 
+  const searchSermons = async (query: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      // Obtener sermones del localStorage o usar datos por defecto
+      const storedSermons = localStorage.getItem('sermons')
+      let allSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
+
+      // Filtrar por query de búsqueda
+      const filteredSermons = allSermons.filter(sermon => 
+        sermon.title.toLowerCase().includes(query.toLowerCase()) ||
+        (sermon.description && sermon.description.toLowerCase().includes(query.toLowerCase())) ||
+        sermon.preacher.toLowerCase().includes(query.toLowerCase()) ||
+        (sermon.tags && sermon.tags.some((tag: string) => tag.toLowerCase().includes(query.toLowerCase())))
+      )
+
+      // Aplicar otros filtros si existen
+      let finalSermons = [...filteredSermons]
+
+      if (options?.published !== undefined) {
+        finalSermons = finalSermons.filter(sermon => sermon.is_published === options.published)
+      }
+
+      if (options?.speaker) {
+        finalSermons = finalSermons.filter(sermon => sermon.preacher === options.speaker)
+      }
+
+      if (options?.category) {
+        finalSermons = finalSermons.filter(sermon => sermon.category_id === options.category)
+      }
+
+      if (options?.featured !== undefined) {
+        finalSermons = finalSermons.filter(sermon => sermon.is_featured === options.featured)
+      }
+
+      // Ordenar por fecha de sermón (más reciente primero)
+      finalSermons.sort((a, b) => new Date(b.preached_at).getTime() - new Date(a.preached_at).getTime())
+
+      // Aplicar límite
+      if (options?.limit) {
+        finalSermons = finalSermons.slice(0, options.limit)
+      }
+
+      setSermons(finalSermons)
+      setHasMore(finalSermons.length >= (options?.limit || 10))
+    } catch (err) {
+      setError('Error al buscar sermones')
+      console.error('Error in searchSermons:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadMore = async () => {
+    if (!hasMore || loading) return
+
+    try {
+      setLoading(true)
+      
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      // Obtener sermones del localStorage o usar datos por defecto
+      const storedSermons = localStorage.getItem('sermons')
+      let allSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
+
+      // Aplicar filtros
+      let filteredSermons = [...allSermons]
+
+      if (options?.published !== undefined) {
+        filteredSermons = filteredSermons.filter(sermon => sermon.is_published === options.published)
+      }
+
+      if (options?.speaker) {
+        filteredSermons = filteredSermons.filter(sermon => sermon.preacher === options.speaker)
+      }
+
+      if (options?.category) {
+        filteredSermons = filteredSermons.filter(sermon => sermon.category_id === options.category)
+      }
+
+      if (options?.featured !== undefined) {
+        filteredSermons = filteredSermons.filter(sermon => sermon.is_featured === options.featured)
+      }
+
+      // Ordenar por fecha de sermón (más reciente primero)
+      filteredSermons.sort((a, b) => new Date(b.preached_at).getTime() - new Date(a.preached_at).getTime())
+
+      // Obtener los siguientes elementos
+      const currentLength = sermons.length
+      const nextBatch = filteredSermons.slice(currentLength, currentLength + 10)
+
+      if (nextBatch.length > 0) {
+        setSermons(prev => [...prev, ...nextBatch])
+        setHasMore(currentLength + nextBatch.length < filteredSermons.length)
+      } else {
+        setHasMore(false)
+      }
+    } catch (err) {
+      setError('Error al cargar más sermones')
+      console.error('Error in loadMore:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return {
     sermons,
     loading,
     error,
+    hasMore,
     createSermon,
     updateSermon,
     deleteSermon,
-    getSermonBySlug,
+    getSermonBySlug: async (slug: string): Promise<{ data: Sermon | null; error: Error | null }> => {
+      try {
+        // Simular delay de red
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        // Obtener sermones del localStorage
+        const storedSermons = localStorage.getItem('sermons')
+        const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
+
+        // Buscar el sermón por slug
+        const sermon = existingSermons.find(s => s.slug === slug)
+        
+        if (!sermon) {
+          return { data: null, error: new Error('Sermón no encontrado') }
+        }
+
+        return { data: sermon, error: null }
+      } catch (err) {
+        console.error('Error getting sermon by slug:', err)
+        return { data: null, error: err instanceof Error ? err : new Error('Unknown error') }
+      }
+    },
     incrementViewCount,
     toggleLike,
-    refreshSermons
+    refreshSermons,
+    fetchSermons,
+    searchSermons,
+    loadMore
   }
 }
 

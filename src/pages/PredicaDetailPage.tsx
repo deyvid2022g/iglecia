@@ -12,10 +12,11 @@ import {
   User,
   Maximize,
   Heart,
-  MessageCircle
+  MessageCircle,
+  ChevronRight
 } from 'lucide-react';
 
-export function SermonDetailPage() {
+export function PredicaDetailPage() {
   // Renamed from SermonDetailPage but keeping the same function name for compatibility
   const { slug: _ } = useParams();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -68,25 +69,8 @@ export function SermonDetailPage() {
     ]
   };
 
-  // Simulated related predicas
-  const relatedSermons = [
-    {
-      id: '2',
-      slug: 'amor-y-servicio',
-      title: 'Amor y servicio',
-      speaker: 'Pastor Reynel Dueñas',
-      sermon_date: '2025-01-13',
-      thumbnail_url: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=400&h=225&fit=crop'
-    },
-    {
-      id: '3',
-      slug: 'esperanza-en-tiempos-dificiles',
-      title: 'Esperanza en tiempos difíciles',
-      speaker: 'Pastor Reynel Dueñas',
-      sermon_date: '2025-01-20',
-      thumbnail_url: 'https://images.pexels.com/photos/289586/pexels-photo-289586.jpeg?auto=compress&cs=tinysrgb&w=400&h=225&fit=crop'
-    }
-  ];
+  // Simulated related predicas - empty array to avoid showing mock data
+  const relatedSermons: any[] = [];
 
   useEffect(() => {
     const video = videoRef.current;
@@ -176,9 +160,9 @@ export function SermonDetailPage() {
   // Initialize comments with dummy data
   useEffect(() => {
     setComments([
-      { id: 1, author: 'Carlos Mendoza', content: 'Esta prédica cambió mi perspectiva sobre la fe. Gracias Pastor Reynel.', date: '2023-05-15T14:30:00' },
-      { id: 2, author: 'Laura Sánchez', content: 'Justo lo que necesitaba escuchar hoy. Dios habló a mi corazón.', date: '2023-05-16T09:20:00' },
-      { id: 3, author: 'Roberto Gómez', content: '¡Excelente mensaje! Lo compartiré con mi grupo familiar.', date: '2023-05-16T16:45:00' },
+      { id: 1, author: 'Carlos Mendoza', text: 'Esta prédica cambió mi perspectiva sobre la fe. Gracias Pastor Reynel.', date: '2023-05-15T14:30:00' },
+      { id: 2, author: 'Laura Sánchez', text: 'Justo lo que necesitaba escuchar hoy. Dios habló a mi corazón.', date: '2023-05-16T09:20:00' },
+      { id: 3, author: 'Roberto Gómez', text: '¡Excelente mensaje! Lo compartiré con mi grupo familiar.', date: '2023-05-16T16:45:00' },
     ]);
   }, []);
   
@@ -190,7 +174,7 @@ export function SermonDetailPage() {
     const newCommentObj = {
       id: comments.length + 1,
       author: 'Usuario',
-      content: newComment,
+      text: newComment,
       date: new Date().toISOString()
     };
     
@@ -337,7 +321,7 @@ export function SermonDetailPage() {
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-6">
-                  {sermon.tags.map((tag) => (
+                  {sermon.tags.map((tag: string) => (
                     <span
                       key={tag}
                       className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium"
@@ -439,7 +423,7 @@ export function SermonDetailPage() {
               <div className="bg-white border rounded-lg p-6">
                 <h3 className="text-lg font-semibold mb-4">Prédicas relacionadas</h3>
                 <div className="space-y-4">
-                  {relatedSermons.map((relatedSermon) => (
+                  {relatedSermons.map((relatedSermon: any) => (
                     <Link
                       key={relatedSermon.id}
                       to={`/predicas/${relatedSermon.slug}`}
@@ -501,7 +485,7 @@ export function SermonDetailPage() {
                 <h3 className="text-xl font-semibold mb-6">Comentarios ({comments.length})</h3>
                 
                 <div className="space-y-6 mb-8">
-                  {comments.map((comment) => (
+                  {comments.map((comment: any) => (
                     <div key={comment.id} className="bg-gray-50 rounded-lg p-4">
                       <div className="flex justify-between items-center mb-2">
                         <div className="font-medium">{comment.author}</div>

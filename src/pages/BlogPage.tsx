@@ -9,110 +9,7 @@ export function BlogPage() {
 
   const categories = ['Fe', 'Familia', 'Comunidad', 'Estudios Bíblicos', 'Testimonios'];
   
-  const posts = [
-    {
-      id: 1,
-      slug: 'reflexion-esperanza',
-      title: 'Reflexión semanal: La esperanza que no defrauda',
-      excerpt: 'En tiempos de incertidumbre, la esperanza cristiana se convierte en nuestro ancla. Descubre cómo cultivar una esperanza que trasciende las circunstancias.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastor Reynel Dueñas',
-        avatar: '/Pastor Reynel Dueñas P n g.png'
-      },
-      category: 'Fe',
-      tags: ['esperanza', 'vida cristiana', 'reflexión'],
-      publishedAt: '2025-01-25',
-      readTime: 5,
-      featuredImage: 'https://images.pexels.com/photos/289586/pexels-photo-289586.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 234
-    },
-    {
-      id: 2,
-      slug: 'voluntariado-como-ayudar',
-      title: 'Cómo ser voluntario en la iglesia: Una guía práctica',
-      excerpt: 'Servir es una de las formas más hermosas de expresar nuestro amor por Dios y por otros. Te mostramos las diferentes oportunidades de voluntariado disponibles.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastor Reynel Dueñas',
-        avatar: '/Pastor Reynel Dueñas P n g.png'
-      },
-      category: 'Comunidad',
-      tags: ['voluntariado', 'servicio', 'comunidad'],
-      publishedAt: '2025-01-22',
-      readTime: 7,
-      featuredImage: 'https://images.pexels.com/photos/6994925/pexels-photo-6994925.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 189
-    },
-    {
-      id: 3,
-      slug: 'fortaleciendo-matrimonio',
-      title: 'Fortaleciendo el matrimonio con principios bíblicos',
-      excerpt: 'El matrimonio es un regalo de Dios que requiere cuidado constante. Exploramos cinco principios fundamentales para un matrimonio sólido.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastor Reynel Dueñas',
-        avatar: '/Pastor Reynel Dueñas P n g.png'
-      },
-      category: 'Familia',
-      tags: ['matrimonio', 'familia', 'relaciones'],
-      publishedAt: '2025-01-20',
-      readTime: 8,
-      featuredImage: 'https://images.pexels.com/photos/1024993/pexels-photo-1024993.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 312
-    },
-    {
-      id: 4,
-      slug: 'oracion-efectiva',
-      title: 'Los elementos de una oración efectiva',
-      excerpt: 'La oración es mucho más que pedir. Descubre los componentes que hacen que nuestra comunicación con Dios sea más profunda y significativa.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastor Juan Pérez',
-        avatar: 'https://images.pexels.com/photos/697509/pexels-photo-697509.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-      },
-      category: 'Estudios Bíblicos',
-      tags: ['oración', 'espiritualidad', 'crecimiento'],
-      publishedAt: '2025-01-18',
-      readTime: 6,
-      featuredImage: 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 156
-    },
-    {
-      id: 5,
-      slug: 'testimonio-transformacion',
-      title: 'Mi testimonio: Cómo Dios transformó mi vida',
-      excerpt: 'La historia de Ana Martínez, quien encontró esperanza y propósito después de años de lucha personal. Un testimonio que inspira y alienta.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Ana Martínez',
-        avatar: 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-      },
-      category: 'Testimonios',
-      tags: ['testimonio', 'transformación', 'esperanza'],
-      publishedAt: '2025-01-15',
-      readTime: 9,
-      featuredImage: 'https://images.pexels.com/photos/1002703/pexels-photo-1002703.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 423
-    },
-    {
-      id: 6,
-      slug: 'crianza-cristiana',
-      title: 'Crianza con valores cristianos en el siglo XXI',
-      excerpt: 'Los desafíos de criar hijos con valores cristianos en un mundo cambiante. Estrategias prácticas para padres comprometidos con la fe.',
-      content: 'Contenido completo del post...',
-      author: {
-        name: 'Pastora María Gómez',
-        avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-      },
-      category: 'Familia',
-      tags: ['crianza', 'valores', 'educación'],
-      publishedAt: '2025-01-12',
-      readTime: 10,
-      featuredImage: 'https://images.pexels.com/photos/8613049/pexels-photo-8613049.jpeg?auto=compress&cs=tinysrgb&w=800&h=400&fit=crop',
-      views: 278
-    }
-  ];
+  const posts: any[] = [];
 
   const allTags = [...new Set(posts.flatMap(post => post.tags))];
 
@@ -141,7 +38,7 @@ export function BlogPage() {
   };
 
   // Featured post (most recent)
-  const featuredPost = posts[0];
+  const featuredPost = posts.length > 0 ? posts[0] : null;
   const regularPosts = filteredPosts.slice(1);
 
   return (
@@ -164,7 +61,7 @@ export function BlogPage() {
       {/* Filters and Search */}
       <section className="bg-white py-8 border-b">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row lg:flex-row gap-4 items-stretch sm:items-center">
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -237,7 +134,7 @@ export function BlogPage() {
       </section>
 
       {/* Featured Post */}
-      {!searchTerm && !selectedCategory && !selectedTag && (
+      {!searchTerm && !selectedCategory && !selectedTag && featuredPost && (
         <section className="py-12 bg-gray-50">
           <div className="container mx-auto px-4 sm:px-6">
             <h2 className="text-2xl font-bold mb-8">Artículo destacado</h2>
@@ -321,7 +218,7 @@ export function BlogPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6 lg:gap-8">
               {(searchTerm || selectedCategory || selectedTag ? filteredPosts : regularPosts).map((post) => (
                 <article key={post.id} className="card group">
                   <div className="aspect-video rounded-lg overflow-hidden mb-4">
@@ -358,7 +255,7 @@ export function BlogPage() {
                     </p>
 
                     <div className="flex flex-wrap gap-1">
-                      {post.tags.slice(0, 3).map((tag) => (
+                      {post.tags.slice(0, 3).map((tag: string) => (
                         <button
                           key={tag}
                           onClick={() => setSelectedTag(tag)}

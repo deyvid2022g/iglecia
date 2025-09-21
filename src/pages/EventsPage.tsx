@@ -1,65 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Calendar, MapPin, Clock, Users, Search, Filter, Heart, MessageCircle, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { 
-  Calendar as CalendarIcon, 
-  Clock, 
-  MapPin, 
-  Users, 
-  Filter,
-  Search,
-  Heart,
-  MessageCircle,
-  Share2
-} from 'lucide-react';
+import { Database } from '../types/database';
 import { AnimatedCard } from '../components/AnimatedCard';
 import { useEvents } from '../hooks/useEvents';
-import { Event } from '../lib/supabase';
+import { useEventInteractions } from '../hooks/useEventInteractions';
+import { EventComments } from '../components/EventComments';
+import { EventRSVPModal } from '../components/EventRSVPModal';
+import { AddToCalendarModal } from '../components/AddToCalendarModal';
 
-// Definir tipos para los likes y comentarios
-type LikesMap = Record<string, number>;
-type CommentsMap = Record<string, number>;
+type Event = Database['public']['Tables']['events']['Row'];
 
 export function EventsPage() {
   const [_currentDate, _setCurrentDate] = useState(new Date());
   const [selectedType, setSelectedType] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list');
-  
-  // Estado para los likes y comentarios
-  const [eventLikes, setEventLikes] = useState<LikesMap>({});
-  const [eventComments, setEventComments] = useState<CommentsMap>({});
+  const [commentsEventId, setCommentsEventId] = useState<string | null>(null);
+  const [rsvpEventId, setRsvpEventId] = useState<string | null>(null);
+  const [calendarEventId, setCalendarEventId] = useState<string | null>(null);
 
   // Usar el hook de eventos
   const { events, loading, error } = useEvents({ published: true });
+  
+  // Usar el hook de interacciones
+  const { 
+    toggleLike, 
+    getLikesCount, 
+    getCommentsCount,
+    hasUserLiked,
+    loading: interactionsLoading 
+  } = useEventInteractions();
 
   const eventTypes = ['Culto', 'Niños', 'Jóvenes', 'Grupo Pequeño', 'Evento Especial'];
   
-  // Inicializar likes y comentarios
-  useEffect(() => {
-    if (events.length > 0) {
-      // Simular datos iniciales
-      const initialLikes: LikesMap = {};
-      const initialComments: CommentsMap = {};
-      
-      events.forEach(event => {
-        initialLikes[event.id] = Math.floor(Math.random() * 50);
-        initialComments[event.id] = Math.floor(Math.random() * 10);
-      });
-      
-      setEventLikes(initialLikes);
-      setEventComments(initialComments);
-    }
-  }, [events]);
-  
   // Función para manejar los likes
-  const handleLike = (eventId: string) => {
-    setEventLikes(prev => {
-      const currentLikes = prev[eventId] || 0;
-      return {
-        ...prev,
-        [eventId]: currentLikes + 1
-      };
-    });
+  const handleLike = async (eventId: string) => {
+    const result = await toggleLike(eventId);
+    if (!result.success && result.error) {
+      alert(result.error);
+    }
+  };
+
+  // Función para abrir comentarios
+  const openComments = (eventId: string) => {
+    setCommentsEventId(eventId);
+  };
+
+  // Función para cerrar comentarios
+  const closeComments = () => {
+    setCommentsEventId(null);
+  };
+
+  const openRSVP = (eventId: string) => {
+    setRsvpEventId(eventId);
+  };
+
+  const closeRSVP = () => {
+    setRsvpEventId(null);
+  };
+
+  const openCalendar = (eventId: string) => {
+    setCalendarEventId(eventId);
+  };
+
+  const closeCalendar = () => {
+    setCalendarEventId(null);
   };
   
   // Función para compartir un evento
@@ -68,14 +74,14 @@ export function EventsPage() {
       navigator.share({
         title: event.title,
         text: `Te invito a este evento: ${event.title}`,
-        url: window.location.origin + '/eventos/' + event.slug
+        url: window.location.origin + '/eventos/' + (event.slug || event.id)
       })
       .catch((_) => console.log('Error compartiendo:', _));
     } else {
       // Fallback para navegadores que no soportan Web Share API
       const dummyInput = document.createElement('input');
       document.body.appendChild(dummyInput);
-      dummyInput.value = window.location.origin + '/eventos/' + event.slug;
+      dummyInput.value = window.location.origin + '/eventos/' + (event.slug || event.id);
       dummyInput.select();
       document.execCommand('copy');
       document.body.removeChild(dummyInput);
@@ -88,8 +94,8 @@ export function EventsPage() {
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (event.host && event.host.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType = !selectedType || event.type === selectedType;
+                         (event.created_by && event.created_by.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesType = !selectedType || selectedType === 'all';
     
     return matchesSearch && matchesType;
   });
@@ -103,8 +109,8 @@ export function EventsPage() {
     });
   };
 
-  const formatTime = (time: string) => {
-    return new Date(`2000-01-01T${time}`).toLocaleTimeString('es-ES', {
+  const formatTime = (dateTimeString: string) => {
+    return new Date(dateTimeString).toLocaleTimeString('es-ES', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
@@ -140,16 +146,7 @@ export function EventsPage() {
     );
   }
 
-  const getEventTypeColor = (type: string) => {
-    const colors: { [key: string]: string } = {
-      'Culto': 'bg-blue-100 text-blue-800',
-      'Niños': 'bg-green-100 text-green-800',
-      'Jóvenes': 'bg-purple-100 text-purple-800',
-      'Grupo Pequeño': 'bg-yellow-100 text-yellow-800',
-      'Evento Especial': 'bg-red-100 text-red-800'
-    };
-    return colors[type] || 'bg-gray-100 text-gray-800';
-  };
+
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -259,7 +256,7 @@ export function EventsPage() {
         <div className="container mx-auto px-4 sm:px-6">
           {filteredEvents.length === 0 ? (
             <div className="text-center py-16">
-              <CalendarIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-4">No se encontraron eventos</h3>
               <p className="text-gray-600 mb-6">
                 Intenta con diferentes términos de búsqueda o filtros.
@@ -280,7 +277,7 @@ export function EventsPage() {
                     <div className="lg:col-span-1">
                       <div className="aspect-video lg:aspect-square rounded-lg overflow-hidden">
                         <img
-                          src={event.image_url || 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop'}
+                          src={event.featured_image || 'https://images.pexels.com/photos/356079/pexels-photo-356079.jpeg?auto=compress&cs=tinysrgb&w=600&h=300&fit=crop'}
                           alt={`Imagen del evento: ${event.title}`}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
@@ -292,8 +289,8 @@ export function EventsPage() {
                     <div className="lg:col-span-2 space-y-4">
                       <div>
                         <div className="flex items-center gap-3 mb-2">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getEventTypeColor(event.type)}`}>
-                            {event.type}
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800`}>
+                            Evento
                           </span>
                           {event.requires_rsvp && (
                             <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
@@ -316,47 +313,46 @@ export function EventsPage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div className="flex items-center text-gray-600">
-                          <CalendarIcon className="w-4 h-4 mr-2" />
+                          <Calendar className="w-4 h-4 mr-2" />
                           <span>{formatDate(event.event_date)}</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Clock className="w-4 h-4 mr-2" />
-                          <span>{formatTime(event.start_time)} - {formatTime(event.end_time)}</span>
+                          <span>{event.start_time ? formatTime(event.start_time) : 'Hora por confirmar'} - {event.end_time ? formatTime(event.end_time) : 'Hora por confirmar'}</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <MapPin className="w-4 h-4 mr-2" />
-                          <span>{event.locations?.name || 'Ubicación por confirmar'}</span>
+                          <span>{event.location_name || 'Ubicación por confirmar'}</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Users className="w-4 h-4 mr-2" />
                           <span>
-                            {event.current_registrations}/{event.capacity || 'Sin límite'} inscritos
+                            {event.current_attendees || 0}/{event.max_attendees || 'Sin límite'} inscritos
                           </span>
                         </div>
                       </div>
 
                       <div className="text-sm text-gray-600">
-                        <strong>Anfitrión:</strong> {event.host}
+                        <strong>Organizador:</strong> {event.host_contact || 'Por confirmar'}
                       </div>
                     </div>
 
                     {/* Action Buttons */}
                     <div className="lg:col-span-1 flex flex-col justify-between">
                       <div className="space-y-3">
-                        <Link
-                          to={`/eventos/${event.slug}`}
-                          className="btn-primary w-full text-center"
-                        >
-                          Ver detalles
-                        </Link>
-                        
                         {event.requires_rsvp && (
-                          <button className="btn-secondary w-full">
+                          <button 
+                            onClick={() => openRSVP(event.id)}
+                            className="btn-primary w-full"
+                          >
                             Inscribirse
                           </button>
                         )}
 
-                        <button className="btn-secondary w-full">
+                        <button 
+                          onClick={() => openCalendar(event.id)}
+                          className="btn-secondary w-full"
+                        >
                           Agregar al calendario
                         </button>
                         
@@ -364,20 +360,27 @@ export function EventsPage() {
                         <div className="flex justify-between mt-4">
                           <button
                             onClick={() => handleLike(event.id)}
-                            className="p-2 text-gray-600 hover:text-red-500 hover:bg-gray-100 rounded-lg transition-colors focus-ring flex items-center"
+                            disabled={interactionsLoading}
+                            className={`p-2 hover:bg-gray-100 rounded-lg transition-colors focus-ring flex items-center ${
+                              hasUserLiked(event.id) 
+                                ? 'text-red-500' 
+                                : 'text-gray-600 hover:text-red-500'
+                            }`}
                             aria-label="Me gusta"
                           >
-                            <Heart className="w-4 h-4 mr-1" />
-                            <span className="text-sm">{eventLikes[event.id] || 0}</span>
+                            <Heart 
+                              className={`w-4 h-4 mr-1 ${hasUserLiked(event.id) ? 'fill-current' : ''}`} 
+                            />
+                            <span className="text-sm">{getLikesCount(event.id)}</span>
                           </button>
-                          <Link
-                            to={`/eventos/${event.slug}`}
+                          <button
+                            onClick={() => openComments(event.id)}
                             className="p-2 text-gray-600 hover:text-blue-500 hover:bg-gray-100 rounded-lg transition-colors focus-ring flex items-center"
                             aria-label="Ver comentarios"
                           >
                             <MessageCircle className="w-4 h-4 mr-1" />
-                            <span className="text-sm">{eventComments[event.id] || 0}</span>
-                          </Link>
+                            <span className="text-sm">{getCommentsCount(event.id)}</span>
+                          </button>
                           <button
                             onClick={() => shareEvent(event)}
                             className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors focus-ring"
@@ -389,17 +392,17 @@ export function EventsPage() {
                       </div>
 
                       {/* Capacity Indicator */}
-                      {event.requires_rsvp && event.capacity && (
+                      {event.requires_rsvp && event.max_attendees && (
                         <div className="mt-4">
                           <div className="flex justify-between text-sm text-gray-600 mb-1">
                             <span>Inscripciones</span>
-                            <span>{Math.round(((event.current_registrations || 0) / event.capacity) * 100)}%</span>
+                            <span>{Math.round(((event.current_attendees || 0) / event.max_attendees) * 100)}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-black h-2 rounded-full transition-all duration-300"
                               style={{
-                                width: `${((event.current_registrations || 0) / event.capacity) * 100}%`
+                                width: `${((event.current_attendees || 0) / event.max_attendees) * 100}%`
                               }}
                             ></div>
                           </div>
@@ -424,7 +427,7 @@ export function EventsPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="text-center">
-                <CalendarIcon className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+                <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-600" />
                 <h3 className="text-xl font-semibold mb-4">Eventos regulares</h3>
                 <p className="text-gray-600 leading-relaxed">
                   Nuestros cultos dominicales y estudios bíblicos semanales no requieren 
@@ -453,6 +456,32 @@ export function EventsPage() {
           </div>
         </div>
       </section>
+
+      {/* Modal de comentarios */}
+      {commentsEventId && (
+        <EventComments
+          eventId={commentsEventId}
+          isOpen={true}
+          onClose={closeComments}
+        />
+      )}
+
+      {/* Modal de RSVP */}
+      {rsvpEventId && (
+        <EventRSVPModal
+          event={events.find(e => e.id === rsvpEventId)!}
+          isOpen={true}
+          onClose={closeRSVP}
+        />
+      )}
+
+      {/* Modal de Calendario */}
+      {calendarEventId && (
+        <AddToCalendarModal
+          event={events.find(e => e.id === calendarEventId)!}
+          onClose={closeCalendar}
+        />
+      )}
     </div>
   );
 }

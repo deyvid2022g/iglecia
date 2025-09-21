@@ -19,10 +19,10 @@ export function PredicasPage() {
   
   const filteredSermons = sermons.filter(sermon => {
     const matchesSearch = sermon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sermon.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sermon.speaker?.toLowerCase().includes(searchTerm.toLowerCase());
+                         (sermon.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+                         sermon.preacher?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTag = !selectedTag || (sermon.tags?.includes(selectedTag) ?? false);
-    const matchesSpeaker = !selectedSpeaker || sermon.speaker === selectedSpeaker;
+    const matchesSpeaker = !selectedSpeaker || sermon.preacher === selectedSpeaker;
     
     return matchesSearch && matchesTag && matchesSpeaker;
   });
@@ -108,7 +108,7 @@ export function PredicasPage() {
       {/* Filters and Search */}
       <section className="bg-white py-8 border-b">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row lg:flex-row gap-4 items-stretch sm:items-center">
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -123,8 +123,40 @@ export function PredicasPage() {
             </div>
 
             {/* Tag Filter */}
+            <div className="relative">
+              <select
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-8 focus:ring-2 focus:ring-black focus:border-black"
+                aria-label="Filtrar por etiqueta"
+              >
+                <option value="">Todas las etiquetas</option>
+                {Array.from(new Set(sermons.flatMap(sermon => sermon.tags || []))).map(tag => (
+                  <option key={tag} value={tag}>
+                    {tag.charAt(0).toUpperCase() + tag.slice(1)}
+                  </option>
+                ))}
+              </select>
+              <Tag className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+            </div>
 
             {/* Speaker Filter */}
+            <div className="relative">
+              <select
+                value={selectedSpeaker}
+                onChange={(e) => setSelectedSpeaker(e.target.value)}
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-8 focus:ring-2 focus:ring-black focus:border-black"
+                aria-label="Filtrar por predicador"
+              >
+                <option value="">Todos los predicadores</option>
+                {Array.from(new Set(sermons.map(sermon => sermon.preacher).filter(Boolean))).map(preacher => (
+                  <option key={preacher} value={preacher}>
+                    {preacher}
+                  </option>
+                ))}
+              </select>
+              <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+            </div>
 
             {/* Clear Filters */}
             {(searchTerm || selectedTag || selectedSpeaker) && (
@@ -165,7 +197,7 @@ export function PredicasPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6 lg:gap-8">
               {filteredSermons.map((sermon) => (
                 <article key={sermon.id} className="card group">
                   <div className="aspect-video relative overflow-hidden rounded-lg mb-4">
@@ -201,9 +233,9 @@ export function PredicasPage() {
                         </Link>
                       </h2>
                       <div className="flex items-center text-gray-600 text-sm space-x-4 mb-3">
-                        <span>{sermon.speaker}</span>
+                        <span>{sermon.preacher}</span>
                         <span>•</span>
-                        <span>{formatDate(sermon.sermon_date)}</span>
+                        <span>{formatDate(sermon.preached_at)}</span>
                         <span>•</span>
                         <span>{sermon.view_count?.toLocaleString() || 0} visualizaciones</span>
                       </div>
@@ -214,7 +246,7 @@ export function PredicasPage() {
                     </p>
 
                     <div className="flex flex-wrap gap-2">
-                      {sermon.tags?.map((tag) => (
+                      {sermon.tags?.map((tag: string) => (
                         <button
                           key={tag}
                           onClick={() => setSelectedTag(tag)}
@@ -235,7 +267,7 @@ export function PredicasPage() {
                           <Play className="w-4 h-4 mr-2" />
                           Ver completo
                         </Link>
-                        {sermon.has_transcript && (
+                        {sermon.transcript && (
                           <span className="inline-flex items-center text-gray-600 text-sm">
                             📄 Transcripción disponible
                           </span>
@@ -261,7 +293,7 @@ export function PredicasPage() {
                         <button
                           onClick={() => shareSermon({ 
                             title: sermon.title,
-                            speaker_name: sermon.speaker || '',
+                            speaker_name: sermon.preacher || '',
                             slug: sermon.slug
                           })}
                           className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors focus-ring"

@@ -1,0 +1,374 @@
+DOCUMENTACIÓN COMPLETA - CONFIGURACIÓN POSTGRESQL CON MCP
+================================================================
+
+FECHA: 2025-01-21
+PROYECTO: Sistema Web Iglesia
+VERSIÓN: 1.0.0
+
+================================================================
+ÍNDICE
+================================================================
+
+1. INTRODUCCIÓN
+2. CONFIGURACIÓN DE SUPABASE
+3. CONFIGURACIÓN MCP (Model Context Protocol)
+4. ESTRUCTURA DE BASE DE DATOS
+5. CONFIGURACIÓN DE VARIABLES DE ENTORNO
+6. CONEXIÓN Y PRUEBAS
+7. GESTIÓN DE PRÉDICAS/SERMONES
+8. POLÍTICAS DE SEGURIDAD (RLS)
+9. COMANDOS ÚTILES
+10. SOLUCIÓN DE PROBLEMAS
+
+================================================================
+1. INTRODUCCIÓN
+================================================================
+
+Este documento describe la configuración completa de PostgreSQL 
+usando Supabase con el protocolo MCP (Model Context Protocol) 
+para el sistema web de la iglesia.
+
+El MCP permite la comunicación directa con la base de datos 
+PostgreSQL de Supabase a través de PostgREST API, facilitando 
+operaciones CRUD y consultas en tiempo real.
+
+================================================================
+2. CONFIGURACIÓN DE SUPABASE
+================================================================
+
+2.1 CREDENCIALES ACTUALES
+--------------------------
+URL del proyecto: https://toopbtydsiepeoisuecg.supabase.co
+Clave anónima: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+2.2 CONFIGURACIÓN EN DASHBOARD
+------------------------------
+1. Acceder a supabase.com
+2. Ir a Settings > API
+3. Copiar URL del proyecto y clave anónima
+4. Ir a Settings > Database para obtener cadena de conexión
+
+2.3 CONFIGURACIÓN DE AUTENTICACIÓN
+----------------------------------
+- Row Level Security (RLS) habilitado
+- Políticas de seguridad configuradas por roles
+- Autenticación JWT integrada
+
+================================================================
+3. CONFIGURACIÓN MCP (MODEL CONTEXT PROTOCOL)
+================================================================
+
+3.1 ARCHIVO DE CONFIGURACIÓN MCP
+--------------------------------
+Ubicación: .cursor/mcp.json
+
+Contenido:
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "@supabase/mcp-server",
+        "https://toopbtydsiepeoisuecg.supabase.co"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      }
+    }
+  }
+}
+
+3.2 FUNCIONES MCP DISPONIBLES
+-----------------------------
+- mcp_Postgrest_postgrestRequest: Realizar peticiones HTTP a PostgREST
+- mcp_Postgrest_sqlToRest: Convertir SQL a peticiones REST
+- Soporte para operaciones GET, POST, PUT, PATCH, DELETE
+
+================================================================
+4. ESTRUCTURA DE BASE DE DATOS
+================================================================
+
+4.1 TABLAS PRINCIPALES DE SERMONES
+-----------------------------------
+
+SERMON_CATEGORIES:
+- id (UUID, PK)
+- name (VARCHAR 100, UNIQUE)
+- slug (VARCHAR 100, UNIQUE)
+- description (TEXT)
+- color (VARCHAR 7) - Código hexadecimal
+- icon (VARCHAR 50)
+- display_order (INTEGER)
+- is_active (BOOLEAN)
+- created_at, updated_at (TIMESTAMP)
+
+SERMONS:
+- id (UUID, PK)
+- slug (VARCHAR 255, UNIQUE)
+- title (VARCHAR 255)
+- description (TEXT)
+- speaker_name (VARCHAR 255)
+- speaker_bio (TEXT)
+- speaker_image_url (TEXT)
+- preached_date (DATE)
+- duration (INTEGER) - minutos
+- video_url (TEXT)
+- audio_url (TEXT)
+- thumbnail_url (TEXT)
+- transcript (TEXT)
+- has_transcript (BOOLEAN)
+- view_count, like_count, comment_count (INTEGER)
+- is_featured, is_published (BOOLEAN)
+- category_id (UUID, FK)
+- tags (TEXT[])
+- scripture_references (TEXT[])
+- series_name (VARCHAR 255)
+- series_part (INTEGER)
+- download_count (INTEGER)
+- created_by (UUID, FK)
+- series_id (UUID, FK)
+- created_at, updated_at (TIMESTAMP)
+
+SERMON_SERIES:
+- id (UUID, PK)
+- name (VARCHAR 255)
+- slug (VARCHAR 255, UNIQUE)
+- description (TEXT)
+- image_url (TEXT)
+- start_date, end_date (DATE)
+- total_sermons (INTEGER)
+- is_active (BOOLEAN)
+- created_by (UUID, FK)
+- created_at, updated_at (TIMESTAMP)
+
+SERMON_RESOURCES:
+- id (UUID, PK)
+- sermon_id (UUID, FK)
+- title (VARCHAR 255)
+- description (TEXT)
+- resource_type (VARCHAR 50)
+- file_url, external_url (TEXT)
+- file_size (INTEGER)
+- download_count (INTEGER)
+- is_public (BOOLEAN)
+- display_order (INTEGER)
+- created_at, updated_at (TIMESTAMP)
+
+4.2 ÍNDICES OPTIMIZADOS
+-----------------------
+- idx_sermons_slug
+- idx_sermons_preached_date
+- idx_sermons_speaker
+- idx_sermons_category
+- idx_sermons_series
+- idx_sermons_featured
+- idx_sermons_published
+- idx_sermons_tags (GIN)
+- idx_sermons_scripture (GIN)
+- idx_sermons_view_count
+- idx_sermons_like_count
+
+================================================================
+5. CONFIGURACIÓN DE VARIABLES DE ENTORNO
+================================================================
+
+5.1 ARCHIVO .env
+----------------
+# Configuración de Supabase
+VITE_SUPABASE_URL=https://toopbtydsiepeoisuecg.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# URL de conexión directa a PostgreSQL
+SUPABASE_DB_URL=postgres://postgres:password@db.toopbtydsiepeoisuecg.supabase.co:5432/postgres
+
+# Configuración de la aplicación
+VITE_APP_NAME="Sistema Web Iglesia"
+VITE_APP_VERSION=1.0.0
+
+# Configuración de características
+VITE_ENABLE_REALTIME=true
+VITE_ENABLE_ANALYTICS=false
+VITE_ENABLE_PWA=true
+
+# Configuración de contacto
+VITE_CONTACT_EMAIL=contacto@iglesia.com
+VITE_ADMIN_EMAIL=admin@iglesia.com
+
+5.2 SEGURIDAD DE VARIABLES
+--------------------------
+- Nunca commitear archivos .env al repositorio
+- Usar .env.example como plantilla
+- Rotar claves periódicamente
+- Usar variables específicas por entorno
+
+================================================================
+6. CONEXIÓN Y PRUEBAS
+================================================================
+
+6.1 VERIFICACIÓN DE CONEXIÓN MCP
+--------------------------------
+Comando de prueba:
+mcp_Postgrest_postgrestRequest(method: "GET", path: "/sermons?select=*&limit=5")
+
+Respuesta esperada:
+- Array vacío [] si no hay datos
+- Array con objetos si hay sermones
+- Error si hay problemas de conexión
+
+6.2 PRUEBAS DE OPERACIONES CRUD
+-------------------------------
+
+LECTURA (GET):
+- /sermons?select=*
+- /sermon_categories?select=*
+- /sermon_series?select=*
+
+CREACIÓN (POST):
+- /sermon_categories con body JSON
+- /sermons con body JSON
+
+ACTUALIZACIÓN (PATCH):
+- /sermons?id=eq.{uuid}
+- /sermon_categories?id=eq.{uuid}
+
+ELIMINACIÓN (DELETE):
+- /sermons?id=eq.{uuid}
+- Requiere cláusula WHERE obligatoria
+
+================================================================
+7. GESTIÓN DE PRÉDICAS/SERMONES
+================================================================
+
+7.1 FLUJO DE TRABAJO
+--------------------
+1. Crear categorías de sermones
+2. Crear series (opcional)
+3. Crear sermones individuales
+4. Asociar recursos adicionales
+5. Publicar sermones
+
+7.2 CATEGORÍAS PREDEFINIDAS
+---------------------------
+- Doctrina (#3B82F6, book-open)
+- Vida Cristiana (#10B981, heart)
+- Evangelismo (#F59E0B, megaphone)
+- Familia (#EF4444, home)
+- Oración (#8B5CF6, hands-praying)
+- Profético (#F97316, eye)
+- Testimonios (#06B6D4, star)
+- Especiales (#EC4899, gift)
+
+7.3 SERIES PREDEFINIDAS
+-----------------------
+- Fundamentos de la Fe
+- El Carácter de Cristo
+- Promesas de Dios
+- Navidad 2024
+
+================================================================
+8. POLÍTICAS DE SEGURIDAD (RLS)
+================================================================
+
+8.1 SERMON_CATEGORIES
+--------------------
+- Lectura: Categorías activas visibles para todos
+- Escritura: Solo admins y pastores
+
+8.2 SERMONS
+-----------
+- Lectura: Sermones publicados visibles para todos
+- Lectura privada: Creadores, admins y pastores
+- Creación: Usuarios autenticados con roles apropiados
+- Actualización: Creadores, admins y pastores
+- Eliminación: Solo admins y pastores
+
+8.3 SERMON_RESOURCES
+-------------------
+- Lectura pública: Recursos marcados como públicos
+- Lectura privada: Usuarios autenticados
+- Gestión: Admins, pastores y líderes
+
+8.4 SERMON_SERIES
+----------------
+- Lectura: Series activas visibles para todos
+- Gestión: Solo admins y pastores
+
+================================================================
+9. COMANDOS ÚTILES
+================================================================
+
+9.1 CONSULTAS FRECUENTES
+------------------------
+# Obtener todos los sermones publicados
+GET /sermons?is_published=eq.true&select=*
+
+# Obtener sermones por categoría
+GET /sermons?category_id=eq.{uuid}&select=*
+
+# Obtener sermones de una serie
+GET /sermons?series_id=eq.{uuid}&select=*
+
+# Buscar sermones por título
+GET /sermons?title=ilike.*{término}*&select=*
+
+# Obtener sermones más vistos
+GET /sermons?order=view_count.desc&limit=10&select=*
+
+9.2 OPERACIONES DE MANTENIMIENTO
+-------------------------------
+# Limpiar datos de prueba
+DELETE /sermons?id=neq.00000000-0000-0000-0000-000000000000
+
+# Actualizar contadores
+PATCH /sermons?id=eq.{uuid} con {"view_count": nuevo_valor}
+
+# Cambiar estado de publicación
+PATCH /sermons?id=eq.{uuid} con {"is_published": true}
+
+================================================================
+10. SOLUCIÓN DE PROBLEMAS
+================================================================
+
+10.1 ERRORES COMUNES
+--------------------
+
+ERROR: "new row violates row-level security policy"
+SOLUCIÓN: Verificar autenticación y permisos de usuario
+
+ERROR: "DELETE requires a WHERE clause"
+SOLUCIÓN: Siempre incluir filtros en operaciones DELETE
+
+ERROR: "Missing Supabase environment variables"
+SOLUCIÓN: Verificar archivo .env y variables configuradas
+
+10.2 VERIFICACIÓN DE ESTADO
+---------------------------
+1. Verificar conexión a Supabase
+2. Comprobar variables de entorno
+3. Validar configuración MCP
+4. Probar operaciones básicas
+5. Revisar logs de errores
+
+10.3 CONTACTO Y SOPORTE
+----------------------
+- Documentación oficial: supabase.com/docs
+- Comunidad: github.com/supabase/supabase
+- Soporte técnico: support@supabase.io
+
+================================================================
+NOTAS FINALES
+================================================================
+
+Esta configuración proporciona una base sólida para la gestión
+de prédicas y sermones usando PostgreSQL con Supabase y MCP.
+
+La estructura está diseñada para ser escalable y mantener la
+integridad de los datos mientras proporciona flexibilidad
+para futuras expansiones.
+
+Recuerda mantener actualizadas las credenciales y revisar
+periódicamente las políticas de seguridad.
+
+================================================================
+FIN DEL DOCUMENTO
+================================================================
