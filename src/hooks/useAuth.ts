@@ -4,20 +4,19 @@ import { Database } from '../types/database'
 import { logError, AppError } from '../lib/errors'
 
 // Tipos de Supabase
-type User = Database['public']['Tables']['profiles']['Row']
+type User = Database['public']['Tables']['users']['Row']
 type Session = any // Tipo de sesión de Supabase
 
 // Tipo Profile compatible con Supabase
 export interface Profile {
   id: string
-  full_name: string
+  full_name: string | null
   email: string
-  role: 'admin' | 'pastor' | 'leader' | 'member' | 'editor'
-  avatar_url?: string
-  phone?: string
-  bio?: string
+  role: string
+  avatar_url: string | null
+  last_login: string | null
   created_at: string
-  updated_at?: string
+  updated_at: string
 }
 
 // Clase de error de autenticación
@@ -52,8 +51,7 @@ function userToProfile(user: User): Profile {
     email: user.email,
     role: user.role,
     avatar_url: user.avatar_url,
-    phone: user.phone,
-    bio: user.bio,
+    last_login: user.last_login,
     created_at: user.created_at,
     updated_at: user.updated_at
   }
@@ -77,7 +75,7 @@ export const useAuth = (): AuthState & AuthActions => {
           
           // Obtener perfil del usuario
           const { data: profile, error } = await supabase
-            .from('profiles')
+            .from('users')
             .select('*')
             .eq('id', session.user.id)
             .single()
@@ -105,7 +103,7 @@ export const useAuth = (): AuthState & AuthActions => {
         
         // Obtener perfil del usuario
         const { data: profile, error } = await supabase
-          .from('profiles')
+          .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single()
@@ -141,7 +139,7 @@ export const useAuth = (): AuthState & AuthActions => {
       if (data.user) {
         // Obtener perfil del usuario
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+          .from('users')
           .select('*')
           .eq('id', data.user.id)
           .single()
@@ -186,7 +184,7 @@ export const useAuth = (): AuthState & AuthActions => {
         // El perfil se creará automáticamente por el trigger de la base de datos
         // Intentar obtener el perfil
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+          .from('users')
           .select('*')
           .eq('id', data.user.id)
           .single()
@@ -263,12 +261,10 @@ export const useAuth = (): AuthState & AuthActions => {
       
       // Actualizar perfil en Supabase
       const { data: updatedProfile, error } = await supabase
-        .from('profiles')
+        .from('users')
         .update({
           full_name: updates.full_name,
-          avatar_url: updates.avatar_url,
-          phone: updates.phone,
-          bio: updates.bio
+          avatar_url: updates.avatar_url
         })
         .eq('id', user.id)
         .select()

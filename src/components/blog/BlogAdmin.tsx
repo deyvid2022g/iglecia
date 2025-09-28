@@ -17,7 +17,7 @@ export const BlogAdmin: React.FC<BlogAdminProps> = ({ className = '' }) => {
     posts, 
     loading, 
     error, 
-    fetchPosts, 
+    refreshPosts, 
     deletePost, 
     updatePost
   } = useBlog();
@@ -32,14 +32,14 @@ export const BlogAdmin: React.FC<BlogAdminProps> = ({ className = '' }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
 
   useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+    refreshPosts();
+  }, [refreshPosts]);
 
   const handleDeletePost = async (postId: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este post?')) {
       try {
         await deletePost(postId);
-        fetchPosts(); // Refresh the list
+        refreshPosts(); // Refresh the list
       } catch (error) {
         console.error('Error deleting post:', error);
       }
@@ -49,7 +49,7 @@ export const BlogAdmin: React.FC<BlogAdminProps> = ({ className = '' }) => {
   const handleTogglePublished = async (post: BlogPost) => {
     try {
       await updatePost(post.id, { is_published: !post.is_published });
-      fetchPosts(); // Refresh the list
+      refreshPosts(); // Refresh the list
     } catch (error) {
       console.error('Error updating post:', error);
     }
@@ -58,7 +58,7 @@ export const BlogAdmin: React.FC<BlogAdminProps> = ({ className = '' }) => {
   const handleToggleFeatured = async (post: BlogPost) => {
     try {
       await updatePost(post.id, { is_featured: !post.is_featured });
-      fetchPosts(); // Refresh the list
+      refreshPosts(); // Refresh the list
     } catch (error) {
       console.error('Error updating post:', error);
     }
@@ -66,7 +66,7 @@ export const BlogAdmin: React.FC<BlogAdminProps> = ({ className = '' }) => {
 
   const filteredPosts = posts.filter(post => {
     const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
+                         (post.excerpt && post.excerpt.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = !selectedCategory || post.category_id === selectedCategory;
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'published' && post.is_published) ||
@@ -83,7 +83,7 @@ export const BlogAdmin: React.FC<BlogAdminProps> = ({ className = '' }) => {
   const handleCloseForm = () => {
     setShowPostForm(false);
     setEditingPost(null);
-    fetchPosts(); // Refresh the list
+    refreshPosts(); // Refresh the list
   };
 
   if (loading) {
@@ -201,10 +201,10 @@ export const BlogAdmin: React.FC<BlogAdminProps> = ({ className = '' }) => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          {post.featured_image_url ? (
+                          {post.featured_image ? (
                             <img
                               className="h-10 w-10 rounded-lg object-cover"
-                              src={post.featured_image_url}
+                              src={post.featured_image}
                               alt=""
                             />
                           ) : (

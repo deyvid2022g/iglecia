@@ -1,10 +1,33 @@
-import { supabase } from '../lib/supabase';
+import { supabase, setSessionToken } from '../lib/supabase';
 import type { Database } from '../types/database';
+
+// Helper function to ensure authentication headers are set
+const ensureAuthHeaders = () => {
+  const session = localStorage.getItem('auth_session');
+  if (session) {
+    try {
+      const sessionData = JSON.parse(session);
+      if (sessionData.access_token) {
+        setSessionToken(sessionData.access_token);
+      }
+    } catch (error) {
+      console.error('Error parsing session:', error);
+    }
+  }
+};
 
 // Types for sermon entities
 export type SermonCategory = Database['public']['Tables']['sermon_categories']['Row'];
 export type Sermon = Database['public']['Tables']['sermons']['Row'];
 export type SermonInteraction = Database['public']['Tables']['sermon_interactions']['Row'];
+export type SermonSeries = Database['public']['Tables']['sermon_series']['Row'];
+export type SermonResource = Database['public']['Tables']['sermon_resources']['Row'];
+
+// Extended types with relations
+export type SermonWithRelations = Sermon & {
+  sermon_categories?: SermonCategory | null;
+  sermon_series?: SermonSeries | null;
+};
 
 export type SermonCategoryInsert = Database['public']['Tables']['sermon_categories']['Insert'];
 export type SermonInsert = Database['public']['Tables']['sermons']['Insert'];
@@ -60,6 +83,7 @@ export const sermonCategoriesService = {
 
   // Create new category
   async create(category: SermonCategoryInsert) {
+    ensureAuthHeaders();
     const { data, error } = await supabase
       .from('sermon_categories')
       .insert(category)
@@ -72,6 +96,7 @@ export const sermonCategoriesService = {
 
   // Update category
   async update(id: string, updates: SermonCategoryUpdate) {
+    ensureAuthHeaders();
     const { data, error } = await supabase
       .from('sermon_categories')
       .update(updates)
@@ -85,6 +110,7 @@ export const sermonCategoriesService = {
 
   // Delete category
   async delete(id: string) {
+    ensureAuthHeaders();
     const { error } = await supabase
       .from('sermon_categories')
       .delete()
@@ -94,7 +120,7 @@ export const sermonCategoriesService = {
   },
 
   // Subscribe to changes
-  subscribe(callback: (payload: any) => void) {
+  subscribe(callback: (payload: { eventType: string; new: SermonCategory; old: SermonCategory }) => void) {
     return supabase
       .channel('sermon_categories_changes')
       .on('postgres_changes', 
@@ -107,202 +133,348 @@ export const sermonCategoriesService = {
 
 // Sermons Service
 export const sermonsService = {
-  // Get all sermons with optional filtering
-  async getAll(options?: {
-    published?: boolean;
-    featured?: boolean;
-    categoryId?: string;
-    preacher?: string;
-    limit?: number;
-    offset?: number;
-    orderBy?: 'created_at' | 'preached_at' | 'view_count' | 'like_count' | 'title';
-    orderDirection?: 'asc' | 'desc';
-  }) {
-    let query = supabase
-      .from('sermons')
-      .select(`
-        *,
-        sermon_categories (
-          id,
-          name,
-          slug,
-          color
-        )
-      `);
+  // Get all sermons with pagination
+  async getAll(page = 1, limit = 10) {
+    const offset = (page - 1) * limit
     
-    if (options?.published !== undefined) {
-      query = query.eq('is_published', options.published);
-    }
-    
-    if (options?.featured !== undefined) {
-      query = query.eq('is_featured', options.featured);
-    }
-    
-    if (options?.categoryId) {
-      query = query.eq('category_id', options.categoryId);
-    }
-    
-    if (options?.preacher) {
-      query = query.ilike('preacher', `%${options.preacher}%`);
-    }
-    
-    const orderBy = options?.orderBy || 'preached_at';
-    const orderDirection = options?.orderDirection || 'desc';
-    query = query.order(orderBy, { ascending: orderDirection === 'asc' });
-    
-    if (options?.limit) {
-      query = query.limit(options.limit);
-    }
-    
-    if (options?.offset) {
-      query = query.range(options.offset, (options.offset + (options.limit || 10)) - 1);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
-  },
-
-  // Get recent sermons
-  async getRecent(limit?: number) {
-    return await this.getAll({
-      published: true,
-      limit,
-      orderBy: 'preached_at',
-      orderDirection: 'desc'
-    });
-  },
-
-  // Get featured sermons
-  async getFeatured(limit?: number) {
-    return await this.getAll({
-      published: true,
-      featured: true,
-      limit,
-      orderBy: 'preached_at',
-      orderDirection: 'desc'
-    });
-  },
-
-  // Get sermons by preacher
-  async getByPreacher(preacher: string, limit?: number) {
-    return await this.getAll({
-      published: true,
-      preacher,
-      limit,
-      orderBy: 'preached_at',
-      orderDirection: 'desc'
-    });
-  },
-
-  // Get sermon by ID
-  async getById(id: string) {
     const { data, error } = await supabase
       .from('sermons')
-      .select(`
-        *,
-        sermon_categories (
-          id,
-          name,
-          slug,
-          color
-        )
-      `)
-      .eq('id', id)
-      .single();
+      .select('*')
+      .eq('is_published', true)
+      .order('sermon_date', { ascending: false })
+      .range(offset, offset + limit - 1)
     
-    if (error) throw error;
-    return data;
+    if (error) throw error
+    return data
   },
 
-  // Get sermon by slug
+  // Get sermon by slug with all related data
   async getBySlug(slug: string) {
     const { data, error } = await supabase
       .from('sermons')
-      .select(`
-        *,
-        sermon_categories (
-          id,
-          name,
-          slug,
-          color
-        )
-      `)
+      .select('*')
       .eq('slug', slug)
-      .single();
+      .eq('is_published', true)
+      .single()
     
-    if (error) throw error;
-    return data;
+    if (error) throw error
+    return data
+  },
+
+  // Get sermon by ID with all related data
+  async getById(id: string) {
+    const { data, error } = await supabase
+      .from('sermons')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Get sermons by category
+  async getByCategory(categoryId: string, page = 1, limit = 10) {
+    const offset = (page - 1) * limit
+    
+    const { data, error } = await supabase
+      .from('sermons')
+      .select('*')
+      .eq('category_id', categoryId)
+      .eq('is_published', true)
+      .order('sermon_date', { ascending: false })
+      .range(offset, offset + limit - 1)
+    
+    if (error) throw error
+    return data
+  },
+
+  // Get sermons by series
+  async getBySeries(seriesId: string, page = 1, limit = 10) {
+    const offset = (page - 1) * limit
+    
+    const { data, error } = await supabase
+      .from('sermons')
+      .select('*')
+      .eq('series_id', seriesId)
+      .eq('is_published', true)
+      .order('sermon_date', { ascending: false })
+      .range(offset, offset + limit - 1)
+    
+    if (error) throw error
+    return data
+  },
+
+  // Get sermons by speaker
+  async getBySpeaker(speaker: string, page = 1, limit = 10) {
+    const offset = (page - 1) * limit
+    
+    const { data, error } = await supabase
+      .from('sermons')
+      .select('*')
+      .eq('speaker', speaker)
+      .eq('is_published', true)
+      .order('sermon_date', { ascending: false })
+      .range(offset, offset + limit - 1)
+    
+    if (error) throw error
+    return data
+  },
+
+  // Get featured sermons
+  async getFeatured(limit = 5) {
+    const { data, error } = await supabase
+      .from('sermons')
+      .select('*')
+      .eq('is_featured', true)
+      .eq('is_published', true)
+      .order('sermon_date', { ascending: false })
+      .limit(limit)
+    
+    if (error) throw error
+    return data
   },
 
   // Search sermons
-  async search(query: string, options?: { limit?: number }) {
+  async search(query: string, page = 1, limit = 10) {
+    const offset = (page - 1) * limit
+    
     const { data, error } = await supabase
       .from('sermons')
-      .select(`
-        *,
-        sermon_categories (
-          id,
-          name,
-          slug,
-          color
-        )
-      `)
-      .or(`title.ilike.%${query}%, description.ilike.%${query}%, preacher.ilike.%${query}%, scripture_reference.ilike.%${query}%`)
+      .select('*')
+      .or(`title.ilike.%${query}%,description.ilike.%${query}%,speaker.ilike.%${query}%,scripture_references.cs.{${query}}`)
       .eq('is_published', true)
-      .order('preached_at', { ascending: false })
-      .limit(options?.limit || 20);
+      .order('sermon_date', { ascending: false })
+      .range(offset, offset + limit - 1)
     
-    if (error) throw error;
-    return data;
+    if (error) throw error
+    return data
   },
 
-  // Create new sermon
-  async create(sermon: SermonInsert) {
+  // Get sermons with filters
+  async getWithFilters(filters: {
+    categoryId?: string
+    seriesId?: string
+    speaker?: string
+    hasTranscript?: boolean
+    hasVideo?: boolean
+    hasAudio?: boolean
+    tags?: string[]
+    dateFrom?: string
+    dateTo?: string
+  }, page = 1, limit = 10) {
+    const offset = (page - 1) * limit
+    
+    let query = supabase
+      .from('sermons')
+      .select('*')
+      .eq('is_published', true)
+
+    if (filters.categoryId) {
+      query = query.eq('category_id', filters.categoryId)
+    }
+
+    if (filters.seriesId) {
+      query = query.eq('series_id', filters.seriesId)
+    }
+
+    if (filters.speaker) {
+      query = query.eq('speaker', filters.speaker)
+    }
+
+    if (filters.hasTranscript) {
+      query = query.eq('has_transcript', true)
+    }
+
+    if (filters.hasVideo) {
+      query = query.not('video_url', 'is', null)
+    }
+
+    if (filters.hasAudio) {
+      query = query.not('audio_url', 'is', null)
+    }
+
+    if (filters.tags && filters.tags.length > 0) {
+      query = query.overlaps('tags', filters.tags)
+    }
+
+    if (filters.dateFrom) {
+      query = query.gte('sermon_date', filters.dateFrom)
+    }
+
+    if (filters.dateTo) {
+      query = query.lte('sermon_date', filters.dateTo)
+    }
+
+    const { data, error } = await query
+      .order('sermon_date', { ascending: false })
+      .range(offset, offset + limit - 1)
+    
+    if (error) throw error
+    return data
+  },
+
+  // Create a new sermon
+  async create(sermon: Database['public']['Tables']['sermons']['Insert']) {
+    ensureAuthHeaders();
     const { data, error } = await supabase
       .from('sermons')
       .insert(sermon)
       .select()
-      .single();
+      .single()
     
-    if (error) throw error;
-    return data;
+    if (error) throw error
+    return data
   },
 
-  // Update sermon
-  async update(id: string, updates: SermonUpdate) {
+  // Update a sermon
+  async update(id: string, updates: Database['public']['Tables']['sermons']['Update']) {
+    ensureAuthHeaders();
     const { data, error } = await supabase
       .from('sermons')
       .update(updates)
       .eq('id', id)
       .select()
-      .single();
+      .single()
     
-    if (error) throw error;
-    return data;
+    if (error) throw error
+    return data
   },
 
-  // Delete sermon
+  // Delete a sermon
   async delete(id: string) {
+    ensureAuthHeaders();
     const { error } = await supabase
       .from('sermons')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
     
-    if (error) throw error;
+    if (error) throw error
   },
 
   // Increment view count
-  async incrementViewCount(id: string) {
-    const { data, error } = await supabase
-      .rpc('increment_sermon_views', { sermon_id: id });
+  async incrementViews(id: string) {
+    // First get the current sermon data
+    const { data: currentSermon, error: fetchError } = await supabase
+      .from('sermons')
+      .select('view_count')
+      .eq('id', id)
+      .single()
     
-    if (error) throw error;
-    return data;
+    if (fetchError) throw fetchError
+    
+    // Then update with incremented value
+    const { data, error } = await supabase
+      .from('sermons')
+      .update({ 
+        view_count: (currentSermon.view_count || 0) + 1
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Increment like count
+  async incrementLikes(id: string) {
+    // First get the current sermon data
+    const { data: currentSermon, error: fetchError } = await supabase
+      .from('sermons')
+      .select('like_count')
+      .eq('id', id)
+      .single()
+    
+    if (fetchError) throw fetchError
+    
+    // Then update with incremented value
+    const { data, error } = await supabase
+      .from('sermons')
+      .update({ 
+        like_count: (currentSermon.like_count || 0) + 1
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Increment comment count
+  async incrementComments(id: string) {
+    // First get the current sermon data
+    const { data: currentSermon, error: fetchError } = await supabase
+      .from('sermons')
+      .select('comment_count')
+      .eq('id', id)
+      .single()
+    
+    if (fetchError) throw fetchError
+    
+    // Then update with incremented value
+    const { data, error } = await supabase
+      .from('sermons')
+      .update({ 
+        comment_count: (currentSermon.comment_count || 0) + 1
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Get unique speakers
+  async getSpeakers() {
+    const { data, error } = await supabase
+      .from('sermons')
+      .select('speaker, speaker_bio, speaker_image_url')
+      .eq('is_published', true)
+      .not('speaker', 'is', null)
+    
+    if (error) throw error
+    
+    // Remove duplicates and return unique speakers
+    const uniqueSpeakers = data?.reduce((acc: any[], current) => {
+      const exists = acc.find(item => item.speaker === current.speaker)
+      if (!exists) {
+        acc.push(current)
+      }
+      return acc
+    }, [])
+    
+    return uniqueSpeakers
+  },
+
+  // Get sermon statistics
+  async getStats() {
+    const { data, error } = await supabase
+      .from('sermons')
+      .select('view_count, like_count, comment_count')
+      .eq('is_published', true)
+    
+    if (error) throw error
+    
+    const stats = data?.reduce((acc, sermon) => ({
+      totalViews: acc.totalViews + (sermon.view_count || 0),
+      totalLikes: acc.totalLikes + (sermon.like_count || 0),
+      totalComments: acc.totalComments + (sermon.comment_count || 0),
+      totalSermons: acc.totalSermons + 1
+    }), {
+      totalViews: 0,
+      totalLikes: 0,
+      totalComments: 0,
+      totalSermons: 0
+    })
+    
+    return stats
   },
 
   // Subscribe to changes
-  subscribe(callback: (payload: any) => void) {
+  subscribe(callback: (payload: { eventType: string; new: Sermon; old: Sermon }) => void) {
     return supabase
       .channel('sermons_changes')
       .on('postgres_changes', 
@@ -441,7 +613,7 @@ export const sermonInteractionsService = {
   },
 
   // Subscribe to changes
-  subscribe(sermonId: string, callback: (payload: any) => void) {
+  subscribe(sermonId: string, callback: (payload: { eventType: string; new: SermonInteraction; old: SermonInteraction }) => void) {
     return supabase
       .channel(`sermon_interactions_${sermonId}`)
       .on('postgres_changes', 
@@ -456,6 +628,212 @@ export const sermonInteractionsService = {
       .subscribe();
   }
 };
+
+// Sermon Series Service
+export const sermonSeriesService = {
+  // Get all series
+  async getAll() {
+    const { data, error } = await supabase
+      .from('sermon_series')
+      .select('*')
+      .order('display_order', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Get active series
+  async getActive() {
+    const { data, error } = await supabase
+      .from('sermon_series')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Get series by slug
+  async getBySlug(slug: string) {
+    const { data, error } = await supabase
+      .from('sermon_series')
+      .select('*')
+      .eq('slug', slug)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Get series by ID
+  async getById(id: string) {
+    const { data, error } = await supabase
+      .from('sermon_series')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Create a new series
+  async create(series: Database['public']['Tables']['sermon_series']['Insert']) {
+    const { data, error } = await supabase
+      .from('sermon_series')
+      .insert(series)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Update a series
+  async update(id: string, updates: Database['public']['Tables']['sermon_series']['Update']) {
+    const { data, error } = await supabase
+      .from('sermon_series')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Delete a series
+  async delete(id: string) {
+    const { error } = await supabase
+      .from('sermon_series')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+
+  // Get sermons in a series
+  async getSermons(seriesId: string) {
+    const { data, error } = await supabase
+      .from('sermons')
+      .select(`
+        *,
+        sermon_categories (
+          id,
+          name,
+          slug,
+          color
+        )
+      `)
+      .eq('series_id', seriesId)
+      .eq('is_published', true)
+      .order('sermon_date', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  }
+}
+
+// Sermon Resources Service
+export const sermonResourcesService = {
+  // Get all resources for a sermon
+  async getBySermonId(sermonId: string) {
+    const { data, error } = await supabase
+      .from('sermon_resources')
+      .select('*')
+      .eq('sermon_id', sermonId)
+      .order('display_order', { ascending: true })
+    
+    if (error) throw error
+    return data
+  },
+
+  // Get resource by ID
+  async getById(id: string) {
+    const { data, error } = await supabase
+      .from('sermon_resources')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Create a new resource
+  async create(resource: Database['public']['Tables']['sermon_resources']['Insert']) {
+    const { data, error } = await supabase
+      .from('sermon_resources')
+      .insert(resource)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Update a resource
+  async update(id: string, updates: Database['public']['Tables']['sermon_resources']['Update']) {
+    const { data, error } = await supabase
+      .from('sermon_resources')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Delete a resource
+  async delete(id: string) {
+    const { error } = await supabase
+      .from('sermon_resources')
+      .delete()
+      .eq('id', id)
+    
+    if (error) throw error
+  },
+
+  // Increment download count
+  async incrementDownload(id: string) {
+    // First get the current resource data
+    const { data: currentResource, error: fetchError } = await supabase
+      .from('sermon_resources')
+      .select('download_count')
+      .eq('id', id)
+      .single()
+    
+    if (fetchError) throw fetchError
+    
+    // Then update with incremented value
+    const { data, error } = await supabase
+      .from('sermon_resources')
+      .update({ 
+        download_count: (currentResource.download_count || 0) + 1
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Get resources by type
+  async getByType(sermonId: string, resourceType: string) {
+    const { data, error } = await supabase
+      .from('sermon_resources')
+      .select('*')
+      .eq('sermon_id', sermonId)
+      .eq('resource_type', resourceType)
+      .order('display_order', { ascending: true })
+    
+    if (error) throw error
+    return data
+  }
+}
 
 // Combined sermon service
 export const sermonService = {

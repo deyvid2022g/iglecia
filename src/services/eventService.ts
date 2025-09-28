@@ -1,5 +1,20 @@
-import { supabase } from '../lib/supabase';
+import { supabase, setSessionToken } from '../lib/supabase';
 import type { Database } from '../types/database';
+
+// Helper function to ensure authentication headers are set
+const ensureAuthHeaders = () => {
+  const session = localStorage.getItem('auth_session');
+  if (session) {
+    try {
+      const sessionData = JSON.parse(session);
+      if (sessionData.access_token) {
+        setSessionToken(sessionData.access_token);
+      }
+    } catch (error) {
+      console.error('Error parsing session:', error);
+    }
+  }
+};
 
 export type Event = Database['public']['Tables']['events']['Row'];
 export type EventInsert = Database['public']['Tables']['events']['Insert'];
@@ -109,6 +124,7 @@ export const eventService = {
 
     async create(eventData: EventInsert): Promise<{ data: Event | null; error: Error | null }> {
       try {
+        ensureAuthHeaders();
         const { data, error } = await supabase
           .from('events')
           .insert(eventData)
@@ -127,6 +143,7 @@ export const eventService = {
 
     async update(id: string, eventData: EventUpdate): Promise<{ data: Event | null; error: Error | null }> {
       try {
+        ensureAuthHeaders();
         const { data, error } = await supabase
           .from('events')
           .update({
@@ -149,6 +166,7 @@ export const eventService = {
 
     async delete(id: string): Promise<{ error: Error | null }> {
       try {
+        ensureAuthHeaders();
         const { error } = await supabase
           .from('events')
           .update({ is_active: false })

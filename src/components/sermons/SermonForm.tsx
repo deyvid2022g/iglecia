@@ -14,10 +14,10 @@ export const SermonForm: React.FC<SermonFormProps> = ({ onClose, onSave, sermonI
   const [formData, setFormData] = useState<SermonInsert>({
     title: '',
     description: '',
-    preacher: '',
-    preached_at: '',
+    speaker: '',
+    sermon_date: '',
     duration: 30,
-    scripture_reference: '',
+    scripture_references: [],
     series_id: '',
     audio_url: '',
     video_url: '',
@@ -60,10 +60,10 @@ export const SermonForm: React.FC<SermonFormProps> = ({ onClose, onSave, sermonI
         setFormData({
           title: sermon.title,
           description: sermon.description || '',
-          preacher: sermon.preacher,
-          preached_at: sermon.preached_at,
+          speaker: sermon.speaker,
+          sermon_date: sermon.sermon_date,
           duration: sermon.duration || 30,
-          scripture_reference: sermon.scripture_reference || '',
+          scripture_references: sermon.scripture_references || [],
           category_id: sermon.category_id || '',
           audio_url: sermon.audio_url || '',
           video_url: sermon.video_url || '',
@@ -201,8 +201,8 @@ export const SermonForm: React.FC<SermonFormProps> = ({ onClose, onSave, sermonI
               </label>
               <input
                 type="text"
-                name="preacher"
-                value={formData.preacher}
+                name="speaker"
+                value={formData.speaker}
                 onChange={handleInputChange}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -217,8 +217,8 @@ export const SermonForm: React.FC<SermonFormProps> = ({ onClose, onSave, sermonI
               </label>
               <input
                 type="date"
-                name="preached_at"
-                value={formData.preached_at}
+                name="sermon_date"
+                value={formData.sermon_date}
                 onChange={handleInputChange}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -248,9 +248,12 @@ export const SermonForm: React.FC<SermonFormProps> = ({ onClose, onSave, sermonI
               </label>
               <input
                 type="text"
-                name="scripture_reference"
-                value={formData.scripture_reference || ''}
-                onChange={handleInputChange}
+                name="scripture_references"
+                value={Array.isArray(formData.scripture_references) ? formData.scripture_references.join(', ') : ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  scripture_references: e.target.value.split(',').map(ref => ref.trim()).filter(ref => ref)
+                })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Ej: Juan 3:16, Salmos 23, Mateo 5:1-12"
               />

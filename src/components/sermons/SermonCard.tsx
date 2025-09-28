@@ -105,11 +105,11 @@ export const SermonCard: React.FC<SermonCardProps> = ({
         )}
 
         {/* Scripture Reference */}
-        {sermon.scripture_reference && (
+        {sermon.scripture_references && sermon.scripture_references.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
               <BookOpen className="w-4 h-4" />
-              <span className="font-medium">{sermon.scripture_reference}</span>
+              <span className="font-medium">{sermon.scripture_references.join(', ')}</span>
             </div>
           </div>
         )}
@@ -118,15 +118,15 @@ export const SermonCard: React.FC<SermonCardProps> = ({
         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
           <div className="flex items-center gap-1">
             <Calendar className="w-4 h-4" />
-            <span>{formatDate(sermon.preached_at || sermon.created_at)}</span>
+            <span>{formatDate(sermon.sermon_date || sermon.created_at)}</span>
           </div>
           
-          {sermon.preacher && (
-            <div className="flex items-center gap-1">
-              <User className="w-4 h-4" />
-              <span>{sermon.preacher}</span>
-            </div>
-          )}
+          {sermon.speaker && (
+              <div className="flex items-center gap-1">
+                <User className="w-4 h-4" />
+                <span>{sermon.speaker}</span>
+              </div>
+            )}
           
           <div className="flex items-center gap-1">
             {getMediaIcon()}

@@ -7,7 +7,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-// Configuración mejorada del cliente con opciones explícitas
+// Variable global para almacenar el token de sesión personalizada
+let sessionToken: string | null = null;
+
+// Función para establecer el token de sesión
+export const setSessionToken = (token: string | null) => {
+  sessionToken = token;
+};
+
+// Función para obtener el token de sesión
+export const getSessionToken = () => sessionToken;
+
+// Configuración del cliente sin sobrescribir el header Authorization
+// Esto evita enviar un header Authorization vacío o un token no válido que provoque CORS/preflight y abortos de petición
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -16,61 +28,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
-// Configurar interceptor para asegurar que todas las solicitudes incluyan la API key
-supabase.functions.setAuth(supabaseAnonKey)
-
-// Configurar el cliente para que incluya la API key en todas las solicitudes
-const originalFetch = globalThis.fetch
-const customFetch = async (url: RequestInfo | URL, options: RequestInit = {}) => {
-  const headers = new Headers(options.headers || {})
-  
-  // Asegurar que la API key esté presente en todas las solicitudes
-  if (!headers.has('apikey')) {
-    headers.set('apikey', supabaseAnonKey)
-  }
-  
-  // Asegurar que la autorización esté presente
-  if (!headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${supabaseAnonKey}`)
-  }
-  
-  // Asegurar que el Content-Type esté presente
-  if (!headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json')
-  }
-  
-  // Añadir el header Accept para evitar errores 406
-  if (!headers.has('Accept')) {
-    headers.set('Accept', 'application/json')
-  }
-  
-  // Añadir el header Prefer para recibir los datos insertados
-  if (!headers.has('Prefer')) {
-    headers.set('Prefer', 'return=representation')
-  }
-  
-  const modifiedOptions = {
-    ...options,
-    headers
-  }
-  
-  return originalFetch(url, modifiedOptions)
-}
-
-// Reemplazar el fetch global para las solicitudes de Supabase
-if (typeof window !== 'undefined') {
-  const originalWindowFetch = window.fetch
-  window.fetch = function(input, init) {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input instanceof Request ? input.url : String(input))
-    
-    // Solo interceptar solicitudes a Supabase
-    if (url.includes(supabaseUrl)) {
-      return customFetch(input, init)
-    }
-    
-    // Para otras solicitudes, usar el fetch original
-    return originalWindowFetch.apply(this, [input, init])
-  }
+// Configuración adicional del cliente
+export const supabaseConfig = {
+  url: supabaseUrl,
+  key: supabaseAnonKey
 }
 
 // Types for our database
@@ -86,10 +47,87 @@ export interface Profile {
 
 export interface LocalUser {
   id: string
-  email: string
+  email: string | null
   full_name: string | null
   avatar_url: string | null
   role: 'admin' | 'user'
+  created_at: string
+  updated_at: string
+}
+
+// Church Settings Types
+export interface ChurchSetting {
+  id: string
+  setting_key: string
+  setting_value: string
+  setting_type: string
+  category: string
+  description: string | null
+  is_public: boolean
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ServiceSchedule {
+  id: string
+  service_name: string
+  service_type: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+  location: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface OfficeHours {
+  id: string
+  department: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SpecialDate {
+  id: string
+  title: string
+  description: string | null
+  date: string
+  date_type: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ChurchFacility {
+  id: string
+  name: string
+  description: string | null
+  facility_type: string
+  capacity: number | null
+  floor_level: number | null
+  is_public: boolean
+  is_active: boolean
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface FacilityBooking {
+  id: string
+  facility_id: string
+  booked_by_user_id: string
+  title: string
+  description: string | null
+  start_datetime: string
+  end_datetime: string
+  status: string
   created_at: string
   updated_at: string
 }

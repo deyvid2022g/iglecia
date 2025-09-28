@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { type Ministry } from '../lib/supabase'
-import { useAuth } from './useAuth'
+import { useAuth } from '../contexts/SupabaseAuthContext'
 
 export interface MinistriesState {
   ministries: Ministry[]

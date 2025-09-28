@@ -5,7 +5,7 @@ import { Database } from '../../types/database';
 type BlogPost = Database['public']['Tables']['blog_posts']['Row']
 type BlogCategory = { id: string; name: string; description?: string }
 import { useBlog } from '../../hooks/useBlog';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
 
 interface BlogPostFormProps {
   post?: BlogPost | null;
@@ -52,18 +52,18 @@ export const BlogPostForm: React.FC<BlogPostFormProps> = ({
         slug: post.slug || '',
         excerpt: post.excerpt || '',
         content: post.content || '',
-        featured_image_url: post.featured_image_url || '',
+        featured_image_url: post.featured_image || '',
         category_id: post.category_id || '',
         tags: post.tags || [],
         is_published: post.is_published || false,
         is_featured: post.is_featured || false,
-        allow_comments: post.allow_comments !== false,
-        seo_title: post.seo_title || '',
-        seo_description: post.seo_description || '',
-        seo_keywords: post.seo_keywords || [],
-        social_title: post.social_title || '',
-        social_description: post.social_description || '',
-        social_image_url: post.social_image_url || ''
+        allow_comments: true, // Valor por defecto ya que no existe en el esquema
+        seo_title: post.meta_title || '',
+        seo_description: post.meta_description || '',
+        seo_keywords: [], // Valor por defecto ya que no existe en el esquema
+        social_title: '', // Valor por defecto ya que no existe en el esquema
+        social_description: '', // Valor por defecto ya que no existe en el esquema
+        social_image_url: '' // Valor por defecto ya que no existe en el esquema
       });
     }
   }, [post]);
@@ -154,10 +154,20 @@ export const BlogPostForm: React.FC<BlogPostFormProps> = ({
     }
 
     try {
+      // Mapear las propiedades del formulario a las propiedades de la base de datos
       const postData = {
-        ...formData,
-        author_id: user?.id || '',
-        read_time: Math.ceil(formData.content.split(' ').length / 200) // Estimate reading time
+        title: formData.title,
+        slug: formData.slug,
+        excerpt: formData.excerpt,
+        content: formData.content,
+        featured_image: formData.featured_image_url,
+        category_id: formData.category_id,
+        tags: formData.tags,
+        is_published: formData.is_published,
+        is_featured: formData.is_featured,
+        meta_title: formData.seo_title,
+        meta_description: formData.seo_description,
+        author_id: user?.id || ''
       };
 
       if (post) {
@@ -174,10 +184,20 @@ export const BlogPostForm: React.FC<BlogPostFormProps> = ({
   };
 
   const handleSaveDraft = async () => {
+    // Mapear las propiedades del formulario a las propiedades de la base de datos
     const draftData = {
-      ...formData,
-      author_id: user?.id || '',
-      is_published: false
+      title: formData.title,
+      slug: formData.slug,
+      excerpt: formData.excerpt,
+      content: formData.content,
+      featured_image: formData.featured_image_url,
+      category_id: formData.category_id,
+      tags: formData.tags,
+      is_published: false,
+      is_featured: formData.is_featured,
+      meta_title: formData.seo_title,
+      meta_description: formData.seo_description,
+      author_id: user?.id || ''
     };
 
     try {

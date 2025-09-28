@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase, setSessionToken } from '../lib/supabase'
 import * as bcrypt from 'bcryptjs'
 
 export interface AuthUser {
@@ -42,6 +42,9 @@ class AuthService {
       // Crear sesión y guardarla en Supabase
       const session = await this.createSession(user);
       this.session = session;
+      
+      // Establecer el token en el cliente de Supabase
+      setSessionToken(session.access_token);
       
       // Guardar sesión en localStorage
       localStorage.setItem('auth_session', JSON.stringify(session));
@@ -116,6 +119,9 @@ class AuthService {
       const session = await this.createSession(createdUser);
       this.session = session;
       
+      // Establecer el token en el cliente de Supabase
+      setSessionToken(session.access_token);
+      
       // Guardar sesión en localStorage
       localStorage.setItem('auth_session', JSON.stringify(session));
       
@@ -150,6 +156,10 @@ class AuthService {
       }
       
       this.session = null;
+      
+      // Limpiar el token del cliente de Supabase
+      setSessionToken(null);
+      
       localStorage.removeItem('auth_session');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -179,7 +189,7 @@ class AuthService {
   }
 
   // Escuchar cambios en el estado de autenticación
-  onAuthStateChange(callback: (event: string, session: any) => void) {
+  onAuthStateChange(callback: (event: string, session: Session | null) => void) {
     // Implementación simple para compatibilidad
     const currentSession = this.getSession();
     if (currentSession) {
@@ -188,12 +198,14 @@ class AuthService {
     
     // No hay un verdadero listener de eventos, pero podemos simular la interfaz
     return {
-      data: { subscription: { unsubscribe: () => {} } }
+      data: { subscription: { unsubscribe: () => {
+        // Cleanup logic would go here in a real implementation
+      } } }
     };
   }
   
   // Crear una sesión para el usuario y guardarla en Supabase
-  private async createSession(user: any): Promise<Session> {
+  private async createSession(user: AuthUser): Promise<Session> {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // Expira en 7 días
     
@@ -253,6 +265,10 @@ class AuthService {
       }
       
       this.session = session;
+      
+      // Establecer el token en el cliente de Supabase
+      setSessionToken(session.access_token);
+      
       return session;
     } catch (error) {
       console.error('Error parsing session:', error);

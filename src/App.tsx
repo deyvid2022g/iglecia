@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { RealtimeProvider } from './contexts/RealtimeContext'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { Header } from './components/layout/Header'
@@ -18,11 +18,15 @@ import { DonatePage } from './pages/DonatePage'
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
+  const location = useLocation();
+  const isLoginPage = location.pathname === '/login';
+  const isDashboardPage = location.pathname === '/dashboard';
+
   return (
     <ErrorBoundary>
       <RealtimeProvider>
         <div className="min-h-screen bg-gray-50 flex flex-col">
-          <Header />
+          {!isLoginPage && !isDashboardPage && <Header />}
           <main className="flex-grow">
             <Routes>
               <Route path="/" element={<HomePage />} />
@@ -51,7 +55,7 @@ function App() {
               />
             </Routes>
           </main>
-          <Footer />
+          {!isLoginPage && !isDashboardPage && <Footer />}
         </div>
       </RealtimeProvider>
     </ErrorBoundary>

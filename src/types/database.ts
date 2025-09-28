@@ -13,38 +13,26 @@ export interface Database {
         Row: {
           id: string
           name: string
-          slug: string
           description: string | null
           color: string | null
           is_active: boolean
-          display_order: number
-          post_count: number
           created_at: string
-          updated_at: string
         }
         Insert: {
           id?: string
           name: string
-          slug: string
           description?: string | null
           color?: string | null
           is_active?: boolean
-          display_order?: number
-          post_count?: number
           created_at?: string
-          updated_at?: string
         }
         Update: {
           id?: string
           name?: string
-          slug?: string
           description?: string | null
           color?: string | null
           is_active?: boolean
-          display_order?: number
-          post_count?: number
           created_at?: string
-          updated_at?: string
         }
       }
       blog_interactions: {
@@ -318,8 +306,9 @@ export interface Database {
           slug: string
           description: string | null
           color: string | null
-          is_active: boolean
+          icon: string | null
           display_order: number
+          is_active: boolean
           created_at: string
           updated_at: string
         }
@@ -329,8 +318,9 @@ export interface Database {
           slug: string
           description?: string | null
           color?: string | null
-          is_active?: boolean
+          icon?: string | null
           display_order?: number
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -340,8 +330,9 @@ export interface Database {
           slug?: string
           description?: string | null
           color?: string | null
-          is_active?: boolean
+          icon?: string | null
           display_order?: number
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -372,30 +363,61 @@ export interface Database {
           created_at?: string
         }
       }
-      sermons: {
+      sermon_resources: {
+        Row: {
+          id: string
+          sermon_id: string
+          title: string
+          description: string | null
+          resource_type: string
+          file_url: string | null
+          external_url: string | null
+          file_size: number | null
+          download_count: number
+          display_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sermon_id: string
+          title: string
+          description?: string | null
+          resource_type: string
+          file_url?: string | null
+          external_url?: string | null
+          file_size?: number | null
+          download_count?: number
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          sermon_id?: string
+          title?: string
+          description?: string | null
+          resource_type?: string
+          file_url?: string | null
+          external_url?: string | null
+          file_size?: number | null
+          download_count?: number
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      sermon_series: {
         Row: {
           id: string
           title: string
           slug: string
           description: string | null
-          preacher: string
-          scripture_reference: string | null
-          audio_url: string | null
-          video_url: string | null
-          transcript: string | null
           thumbnail_url: string | null
-          duration: number | null
-          category_id: string | null
-          preached_at: string
-          is_published: boolean
-          is_featured: boolean
-          view_count: number
-          like_count: number
-          comment_count: number
-          download_count: number
-          tags: string[] | null
-          meta_title: string | null
-          meta_description: string | null
+          start_date: string | null
+          end_date: string | null
+          is_active: boolean
+          display_order: number
           created_at: string
           updated_at: string
         }
@@ -404,24 +426,11 @@ export interface Database {
           title: string
           slug: string
           description?: string | null
-          preacher: string
-          scripture_reference?: string | null
-          audio_url?: string | null
-          video_url?: string | null
-          transcript?: string | null
           thumbnail_url?: string | null
-          duration?: number | null
-          category_id?: string | null
-          preached_at: string
-          is_published?: boolean
-          is_featured?: boolean
-          view_count?: number
-          like_count?: number
-          comment_count?: number
-          download_count?: number
-          tags?: string[] | null
-          meta_title?: string | null
-          meta_description?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          is_active?: boolean
+          display_order?: number
           created_at?: string
           updated_at?: string
         }
@@ -430,24 +439,97 @@ export interface Database {
           title?: string
           slug?: string
           description?: string | null
-          preacher?: string
-          scripture_reference?: string | null
-          audio_url?: string | null
-          video_url?: string | null
-          transcript?: string | null
           thumbnail_url?: string | null
-          duration?: number | null
-          category_id?: string | null
-          preached_at?: string
-          is_published?: boolean
-          is_featured?: boolean
+          start_date?: string | null
+          end_date?: string | null
+          is_active?: boolean
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      sermons: {
+        Row: {
+          id: string
+          slug: string
+          title: string
+          description: string | null
+          speaker: string
+          speaker_bio: string | null
+          speaker_image_url: string | null
+          sermon_date: string
+          duration: string | null
+          video_url: string | null
+          audio_url: string | null
+          thumbnail_url: string | null
+          transcript: string | null
+          has_transcript: boolean
+          scripture_references: string[] | null
+          view_count: number
+          like_count: number
+          comment_count: number
+          is_published: boolean
+          is_featured: boolean
+          category_id: string | null
+          series_id: string | null
+          tags: string[] | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          title: string
+          description?: string | null
+          speaker: string
+          speaker_bio?: string | null
+          speaker_image_url?: string | null
+          sermon_date: string
+          duration?: string | null
+          video_url?: string | null
+          audio_url?: string | null
+          thumbnail_url?: string | null
+          transcript?: string | null
+          has_transcript?: boolean
+          scripture_references?: string[] | null
           view_count?: number
           like_count?: number
           comment_count?: number
-          download_count?: number
+          is_published?: boolean
+          is_featured?: boolean
+          category_id?: string | null
+          series_id?: string | null
           tags?: string[] | null
-          meta_title?: string | null
-          meta_description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          title?: string
+          description?: string | null
+          speaker?: string
+          speaker_bio?: string | null
+          speaker_image_url?: string | null
+          sermon_date?: string
+          duration?: string | null
+          video_url?: string | null
+          audio_url?: string | null
+          thumbnail_url?: string | null
+          transcript?: string | null
+          has_transcript?: boolean
+          scripture_references?: string[] | null
+          view_count?: number
+          like_count?: number
+          comment_count?: number
+          is_published?: boolean
+          is_featured?: boolean
+          category_id?: string | null
+          series_id?: string | null
+          tags?: string[] | null
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }

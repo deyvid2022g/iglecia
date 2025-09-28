@@ -30,7 +30,7 @@ export const SermonList: React.FC<SermonListProps> = ({
   const [selectedCategory, setSelectedCategory] = useState(categorySlug || '');
   const [selectedSeries, setSelectedSeries] = useState(seriesName || '');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'video' | 'audio' | 'text'>('all');
-  const [sortBy, setSortBy] = useState<'preached_at' | 'view_count' | 'like_count'>('preached_at');
+  const [sortBy, setSortBy] = useState<'sermon_date' | 'view_count' | 'like_count'>('sermon_date');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
 
@@ -109,8 +109,8 @@ export const SermonList: React.FC<SermonListProps> = ({
         case 'like_count':
           return (b.like_count || 0) - (a.like_count || 0);
         default:
-          const dateA = new Date(a.preached_at || a.created_at);
-          const dateB = new Date(b.preached_at || b.created_at);
+          const dateA = new Date(a.sermon_date || a.created_at);
+        const dateB = new Date(b.sermon_date || b.created_at);
           return dateB.getTime() - dateA.getTime();
       }
     });
@@ -182,7 +182,7 @@ export const SermonList: React.FC<SermonListProps> = ({
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="preached_at">Más recientes</option>
+                <option value="sermon_date">Más recientes</option>
                 <option value="view_count">Más vistos</option>
                 <option value="like_count">Más gustados</option>
               </select>

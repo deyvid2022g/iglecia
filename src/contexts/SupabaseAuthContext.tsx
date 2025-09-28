@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AuthUser, authService } from '../services/authService';
+import { setSessionToken } from '../lib/supabase';
 
 interface Session {
   access_token: string;
@@ -28,6 +29,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const currentSession = authService.getSession();
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
+      // Establecer el token en el cliente de Supabase si existe una sesión
+      if (currentSession) {
+        setSessionToken(currentSession.access_token);
+      }
+      
       setLoading(false);
     };
 

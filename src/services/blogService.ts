@@ -1,8 +1,25 @@
-import { supabase } from '../lib/supabase';
+import { supabase, setSessionToken } from '../lib/supabase';
 import type { Database } from '../types/database';
 
-// Types for blog entities
-export type BlogCategory = Database['public']['Tables']['blog_categories']['Row'];
+// Helper function to ensure authentication headers are set
+const ensureAuthHeaders = () => {
+  const session = localStorage.getItem('auth_session');
+  if (session) {
+    try {
+      const sessionData = JSON.parse(session);
+      if (sessionData.access_token) {
+        setSessionToken(sessionData.access_token);
+      }
+    } catch (error) {
+      console.error('Error parsing session:', error);
+    }
+  }
+};
+
+// Types
+export type BlogCategory = Database['public']['Tables']['blog_categories']['Row'] & {
+  post_count?: number;
+};
 export type BlogPost = Database['public']['Tables']['blog_posts']['Row'];
 export type BlogInteraction = Database['public']['Tables']['blog_interactions']['Row'];
 
@@ -16,8 +33,8 @@ export type BlogPostUpdate = Database['public']['Tables']['blog_posts']['Update'
 // Blog Categories Service
 export const blogCategoriesService = {
   // Get all categories
-  async getAll(options?: { active?: boolean; orderBy?: 'display_order' | 'name' | 'created_at' }) {
-    let query = supabase.from('blog_categories').select('*, post_count');
+  async getAll(options?: { active?: boolean; orderBy?: 'name' | 'created_at' }) {
+    let query = supabase.from('blog_categories').select('*');
     
     if (options?.active !== undefined) {
       query = query.eq('is_active', options.active);
@@ -26,40 +43,67 @@ export const blogCategoriesService = {
     if (options?.orderBy) {
       query = query.order(options.orderBy);
     } else {
-      query = query.order('display_order');
+      query = query.order('name');
     }
     
-    const { data, error } = await query;
+    const { data: categories, error } = await query;
     if (error) throw error;
-    return data;
+    
+    // Get post counts for each category
+    if (categories) {
+      const categoriesWithCounts = await Promise.all(
+        categories.map(async (category) => {
+          const { count } = await supabase
+            .from('blog_posts')
+            .select('*', { count: 'exact', head: true })
+            .eq('category_id', category.id)
+            .eq('is_published', true);
+          
+          return {
+            ...category,
+            post_count: count || 0
+          };
+        })
+      );
+      
+      return categoriesWithCounts;
+    }
+    
+    return [];
   },
 
   // Get category by ID
   async getById(id: string) {
-    const { data, error } = await supabase
+    const { data: category, error } = await supabase
       .from('blog_categories')
-      .select('*, post_count')
+      .select('*')
       .eq('id', id)
       .single();
     
     if (error) throw error;
-    return data;
+    
+    if (category) {
+      // Get post count for this category
+      const { count } = await supabase
+        .from('blog_posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('category_id', category.id)
+        .eq('is_published', true);
+      
+      return {
+        ...category,
+        post_count: count || 0
+      };
+    }
+    
+    return null;
   },
 
-  // Get category by slug
-  async getBySlug(slug: string) {
-    const { data, error } = await supabase
-      .from('blog_categories')
-      .select('*, post_count')
-      .eq('slug', slug)
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
+
 
   // Create new category
   async create(category: BlogCategoryInsert) {
+    ensureAuthHeaders();
     const { data, error } = await supabase
       .from('blog_categories')
       .insert(category)
@@ -72,6 +116,7 @@ export const blogCategoriesService = {
 
   // Update category
   async update(id: string, updates: BlogCategoryUpdate) {
+    ensureAuthHeaders();
     const { data, error } = await supabase
       .from('blog_categories')
       .update(updates)
@@ -85,6 +130,7 @@ export const blogCategoriesService = {
 
   // Delete category
   async delete(id: string) {
+    ensureAuthHeaders();
     const { error } = await supabase
       .from('blog_categories')
       .delete()
@@ -94,7 +140,7 @@ export const blogCategoriesService = {
   },
 
   // Subscribe to changes
-  subscribe(callback: (payload: any) => void) {
+  subscribe(callback: (payload: { eventType: string; new: BlogCategory; old: BlogCategory }) => void) {
     return supabase
       .channel('blog_categories_changes')
       .on('postgres_changes', 
@@ -222,6 +268,7 @@ export const blogPostsService = {
 
   // Create new post
   async create(post: BlogPostInsert) {
+    ensureAuthHeaders();
     const { data, error } = await supabase
       .from('blog_posts')
       .insert(post)
@@ -234,6 +281,7 @@ export const blogPostsService = {
 
   // Update post
   async update(id: string, updates: BlogPostUpdate) {
+    ensureAuthHeaders();
     const { data, error } = await supabase
       .from('blog_posts')
       .update(updates)
@@ -247,6 +295,7 @@ export const blogPostsService = {
 
   // Delete post
   async delete(id: string) {
+    ensureAuthHeaders();
     const { error } = await supabase
       .from('blog_posts')
       .delete()
@@ -265,7 +314,7 @@ export const blogPostsService = {
   },
 
   // Subscribe to changes
-  subscribe(callback: (payload: any) => void) {
+  subscribe(callback: (payload: { eventType: string; new: BlogPost; old: BlogPost }) => void) {
     return supabase
       .channel('blog_posts_changes')
       .on('postgres_changes', 
@@ -363,7 +412,7 @@ export const blogInteractionsService = {
   },
 
   // Subscribe to changes
-  subscribe(postId: string, callback: (payload: any) => void) {
+  subscribe(postId: string, callback: (payload: { eventType: string; new: BlogInteraction; old: BlogInteraction }) => void) {
     return supabase
       .channel(`blog_interactions_${postId}`)
       .on('postgres_changes', 

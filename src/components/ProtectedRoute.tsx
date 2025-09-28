@@ -18,14 +18,14 @@ export function ProtectedRoute({
   const { user, loading } = useAuth();
   
   // Funciones de permisos simplificadas basadas en el usuario
-  const hasPermission = (permission?: string): boolean => {
+  const hasPermission = (_permission?: string): boolean => {
     if (!user) return false;
     // Para simplificar, asumimos que todos los usuarios autenticados tienen permisos básicos
     // En una implementación real, esto vendría de la base de datos o metadata del usuario
     return true;
   };
 
-  const hasRole = (role?: string): boolean => {
+  const hasRole = (_role?: string): boolean => {
     if (!user) return false;
     // Para simplificar, asumimos que todos los usuarios autenticados tienen rol básico
     // En una implementación real, esto vendría de la base de datos o metadata del usuario

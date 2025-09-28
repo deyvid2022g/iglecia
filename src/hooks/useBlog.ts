@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { Database } from '../types/database'
-import { useAuth } from './useAuth'
+import { useAuth } from '../contexts/SupabaseAuthContext'
 import * as BlogService from '../services/blogService'
 
 type BlogPost = Database['public']['Tables']['blog_posts']['Row']

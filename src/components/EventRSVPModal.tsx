@@ -59,7 +59,7 @@ export function EventRSVPModal({ event, isOpen, onClose, onSuccess }: EventRSVPM
 
     // Validar teléfono (opcional pero si se ingresa debe ser válido)
     if (formData.phone.trim()) {
-      const phoneRegex = /^[\+]?[0-9\s\-\(\)]{8,}$/;
+      const phoneRegex = /^[+]?[0-9\s\-()]{8,}$/;
       if (!phoneRegex.test(formData.phone.trim())) {
         newErrors.phone = 'Por favor ingresa un teléfono válido';
       }
@@ -137,7 +137,7 @@ export function EventRSVPModal({ event, isOpen, onClose, onSuccess }: EventRSVPM
           setIsSuccess(false);
         }, 2000);
       }
-    } catch (error) {
+    } catch (_error) {
       setErrors({ general: 'Error inesperado. Por favor intenta de nuevo.' });
     } finally {
       setIsSubmitting(false);

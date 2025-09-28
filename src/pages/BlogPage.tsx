@@ -1,29 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Tag, Search, Filter, Clock } from 'lucide-react';
+import { useBlogPosts } from '../hooks/useBlogPosts';
+import { blogService } from '../services/blogService';
 
 export function BlogPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
+  const [categories, setCategories] = useState<any[]>([]);
 
-  const categories = ['Fe', 'Familia', 'Comunidad', 'Estudios Bíblicos', 'Testimonios'];
-  
-  const posts: any[] = [];
-
-  const allTags = [...new Set(posts.flatMap(post => post.tags))];
-
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.author.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || post.category === selectedCategory;
-    const matchesTag = !selectedTag || post.tags.includes(selectedTag);
-    
-    return matchesSearch && matchesCategory && matchesTag;
+  // Use the blog posts hook to fetch published posts
+  const { posts, loading, error, searchPosts } = useBlogPosts({
+    published: true,
+    orderBy: 'published_at',
+    orderDirection: 'desc'
   });
 
+  // Fetch categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const categoriesData = await blogService.categories.getAll();
+        setCategories(categoriesData);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Get all unique tags from posts
+  const allTags = useMemo(() => {
+    return [...new Set(posts.flatMap(post => post.tags || []))];
+  }, [posts]);
+
+  // Filter posts based on search and filters
+  const filteredPosts = useMemo(() => {
+    if (!posts) return [];
+    
+    return posts.filter(post => {
+      const matchesSearch = !searchTerm || 
+        post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        post.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesCategory = !selectedCategory || 
+        (post.category && post.category.slug === selectedCategory);
+      
+      const matchesTag = !selectedTag || 
+        (post.tags && post.tags.includes(selectedTag));
+      
+      return matchesSearch && matchesCategory && matchesTag;
+    });
+  }, [posts, searchTerm, selectedCategory, selectedTag]);
+
+  // Handle search functionality
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      const timeoutId = setTimeout(() => {
+        searchPosts(searchTerm);
+      }, 300); // Debounce search
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm, searchPosts]);
+
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'Fecha no disponible';
     return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
@@ -38,8 +81,8 @@ export function BlogPage() {
   };
 
   // Featured post (most recent)
-  const featuredPost = posts.length > 0 ? posts[0] : null;
-  const regularPosts = filteredPosts.slice(1);
+  const featuredPost = filteredPosts.find(post => post.is_featured);
+  const regularPosts = filteredPosts.filter(post => !post.is_featured);
 
   return (
     <div className="pt-16 md:pt-20 min-h-screen">
@@ -85,8 +128,8 @@ export function BlogPage() {
               >
                 <option value="">Todas las categorías</option>
                 {categories.map(category => (
-                  <option key={category} value={category}>
-                    {category}
+                  <option key={category.id} value={category.slug}>
+                    {category.name}
                   </option>
                 ))}
               </select>
@@ -124,7 +167,7 @@ export function BlogPage() {
 
           {/* Results Count */}
           <div className="mt-4 text-gray-600">
-            {filteredPosts.length === posts.length ? (
+            {loading ? 'Cargando...' : error ? 'Error al cargar artículos' : filteredPosts.length === posts.length ? (
               `${posts.length} artículos publicados`
             ) : (
               `${filteredPosts.length} de ${posts.length} artículos`
@@ -142,7 +185,7 @@ export function BlogPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                 <div className="aspect-video lg:aspect-auto">
                   <img
-                    src={featuredPost.featuredImage}
+                    src={featuredPost.featured_image || '/default-blog-image.jpg'}
                     alt={`Imagen del artículo: ${featuredPost.title}`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -150,7 +193,7 @@ export function BlogPage() {
                 <div className="p-8">
                   <div className="flex items-center gap-3 mb-4">
                     <span className="px-3 py-1 bg-black text-white rounded-full text-xs font-medium">
-                      {featuredPost.category}
+                      {featuredPost.category?.name || 'Sin categoría'}
                     </span>
                     <span className="text-sm text-gray-600">Destacado</span>
                   </div>
@@ -172,18 +215,18 @@ export function BlogPage() {
                     <div className="flex items-center space-x-4 text-sm text-gray-600">
                       <div className="flex items-center">
                         <img
-                          src={featuredPost.author.avatar}
-                          alt={featuredPost.author.name}
+                          src={featuredPost.author?.avatar || '/default-avatar.jpg'}
+                          alt={featuredPost.author?.name || 'Autor'}
                           className="w-6 h-6 rounded-full mr-2"
                         />
-                        <span>{featuredPost.author.name}</span>
+                        <span>{featuredPost.author?.name || 'Autor desconocido'}</span>
                       </div>
                       <span>•</span>
-                      <span>{formatDate(featuredPost.publishedAt)}</span>
+                      <span>{formatDate(featuredPost.published_at)}</span>
                       <span>•</span>
                       <div className="flex items-center">
                         <Clock className="w-4 h-4 mr-1" />
-                        <span>{featuredPost.readTime} min</span>
+                        <span>{featuredPost.read_time || 5} min</span>
                       </div>
                     </div>
                     
@@ -223,7 +266,7 @@ export function BlogPage() {
                 <article key={post.id} className="card group">
                   <div className="aspect-video rounded-lg overflow-hidden mb-4">
                     <img
-                      src={post.featuredImage}
+                      src={post.featured_image || '/default-blog-image.jpg'}
                       alt={`Imagen del artículo: ${post.title}`}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"
@@ -233,11 +276,11 @@ export function BlogPage() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-                        {post.category}
+                        {post.category?.name || 'Sin categoría'}
                       </span>
                       <div className="flex items-center text-xs text-gray-500">
                         <Clock className="w-3 h-3 mr-1" />
-                        {post.readTime} min
+                        {post.read_time || 5} min
                       </div>
                     </div>
 
@@ -255,7 +298,7 @@ export function BlogPage() {
                     </p>
 
                     <div className="flex flex-wrap gap-1">
-                      {post.tags.slice(0, 3).map((tag: string) => (
+                      {(post.tags || []).slice(0, 3).map((tag: string) => (
                         <button
                           key={tag}
                           onClick={() => setSelectedTag(tag)}
@@ -270,16 +313,16 @@ export function BlogPage() {
                     <div className="flex items-center justify-between pt-3 border-t">
                       <div className="flex items-center text-xs text-gray-600">
                         <img
-                          src={post.author.avatar}
-                          alt={post.author.name}
+                          src={post.author?.avatar || '/default-avatar.jpg'}
+                          alt={post.author?.name || 'Autor'}
                           className="w-5 h-5 rounded-full mr-2"
                         />
-                        <span className="mr-2">{post.author.name}</span>
+                        <span className="mr-2">{post.author?.name || 'Autor desconocido'}</span>
                         <span>•</span>
-                        <span className="ml-2">{formatDate(post.publishedAt)}</span>
+                        <span className="ml-2">{formatDate(post.published_at)}</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {post.views} vistas
+                        {post.views || 0} vistas
                       </div>
                     </div>
                   </div>

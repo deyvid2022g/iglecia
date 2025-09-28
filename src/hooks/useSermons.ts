@@ -1,465 +1,46 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
-import { type Sermon } from '../services/sermonService'
-import { useAuth } from './useAuth'
+import { useState, useEffect, useMemo } from 'react'
+import { 
+  sermonsService, 
+  sermonCategoriesService, 
+  sermonSeriesService, 
+  sermonResourcesService,
+  sermonInteractionsService,
+  type Sermon, 
+  type SermonWithRelations,
+  type SermonCategory, 
+  type SermonSeries, 
+  type SermonResource 
+} from '../services/sermonService'
 
-// Re-export Sermon type for external use
-export { type Sermon } from '../services/sermonService'
-
-export interface SermonsState {
-  sermons: Sermon[]
-  loading: boolean
-  error: string | null
-  hasMore: boolean
-}
-
-export interface SermonsActions {
-  createSermon: (sermonData: Omit<Sermon, 'id' | 'created_at' | 'updated_at' | 'view_count' | 'like_count' | 'comment_count'>) => Promise<{ data: Sermon | null; error: Error | null }>
-  updateSermon: (id: string, updates: Partial<Sermon>) => Promise<{ data: Sermon | null; error: Error | null }>
-  deleteSermon: (id: string) => Promise<{ error: Error | null }>
-  getSermonBySlug: (slug: string) => Promise<{ data: Sermon | null; error: Error | null }>
-  incrementViewCount: (id: string) => Promise<{ error: Error | null }>
-  toggleLike: (sermonId: string) => Promise<{ error: Error | null }>
-  refreshSermons: () => Promise<void>
-  fetchSermons: () => Promise<void>
-  searchSermons: (query: string) => Promise<void>
-  loadMore: () => Promise<void>
-}
-
-// Datos mock para sermones
-const getDefaultSermons = (): Sermon[] => []
-
-export const useSermons = (options?: {
-  published?: boolean
-  limit?: number
-  speaker?: string
-  category?: string
-  featured?: boolean
-}): SermonsState & SermonsActions => {
+// Hook para obtener todos los sermones con paginación
+export const useSermons = (page = 1, limit = 10) => {
   const [sermons, setSermons] = useState<Sermon[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [hasMore, setHasMore] = useState(true)
-  const { user } = useAuth()
-
-  const fetchSermons = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Obtener sermones del localStorage o usar datos por defecto
-      const storedSermons = localStorage.getItem('sermons')
-      let allSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Si no hay sermones en localStorage, guardar los datos por defecto
-      if (!storedSermons) {
-        localStorage.setItem('sermons', JSON.stringify(allSermons))
-      }
-
-      // Aplicar filtros
-      let filteredSermons = [...allSermons]
-
-      if (options?.published !== undefined) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.is_published === options.published)
-      }
-
-      if (options?.speaker) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.preacher === options.speaker)
-      }
-
-      if (options?.category) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.category_id === options.category)
-      }
-
-      if (options?.featured !== undefined) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.is_featured === options.featured)
-      }
-
-      // Ordenar por fecha de sermón (más reciente primero)
-      filteredSermons.sort((a, b) => new Date(b.preached_at).getTime() - new Date(a.preached_at).getTime())
-
-      // Aplicar límite
-      if (options?.limit) {
-        filteredSermons = filteredSermons.slice(0, options.limit)
-      }
-
-      setSermons(filteredSermons)
-    } catch (err) {
-      setError('Error al cargar sermones')
-      console.error('Error in fetchSermons:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [options?.published, options?.limit, options?.speaker, options?.category, options?.featured])
 
   useEffect(() => {
-    fetchSermons()
-  }, [fetchSermons, options?.published, options?.limit, options?.speaker, options?.category, options?.featured])
-
-  // Subscribe to real-time changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('sermons_changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'sermons' },
-        (payload) => {
-          console.log('Sermons change received:', payload);
-          // Handle different types of changes
-          if (payload.eventType === 'INSERT' && payload.new) {
-            setSermons(prev => [payload.new as Sermon, ...prev]);
-          } else if (payload.eventType === 'UPDATE' && payload.new) {
-            setSermons(prev => prev.map(sermon => 
-              sermon.id === payload.new.id ? payload.new as Sermon : sermon
-            ));
-          } else if (payload.eventType === 'DELETE' && payload.old) {
-            setSermons(prev => prev.filter(sermon => sermon.id !== payload.old.id));
-          } else {
-            // Fallback: refresh all data
-            fetchSermons();
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchSermons]);
-
-  const createSermon = async (sermonData: Omit<Sermon, 'id' | 'created_at' | 'updated_at' | 'view_count' | 'like_count' | 'comment_count'>) => {
-    try {
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      const newSermon: Sermon = {
-        ...sermonData,
-        id: Date.now().toString(),
-        view_count: 0,
-        like_count: 0,
-        comment_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      // Obtener sermones existentes del localStorage
-      const storedSermons = localStorage.getItem('sermons')
-      const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Agregar el nuevo sermón
-      const updatedSermons = [newSermon, ...existingSermons]
-      localStorage.setItem('sermons', JSON.stringify(updatedSermons))
-
-      // Actualizar el estado local
-      setSermons(prev => [newSermon, ...prev])
-
-      return { data: newSermon, error: null }
-    } catch (err) {
-      console.error('Error creating sermon:', err)
-      return { data: null, error: err as Error }
-    }
-  }
-
-  const updateSermon = async (id: string, updates: Partial<Sermon>) => {
-    try {
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Obtener sermones del localStorage
-      const storedSermons = localStorage.getItem('sermons')
-      const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Encontrar y actualizar el sermón
-      const sermonIndex = existingSermons.findIndex(sermon => sermon.id === id)
-      if (sermonIndex === -1) {
-        throw new Error('Sermón no encontrado')
-      }
-
-      const updatedSermon = {
-        ...existingSermons[sermonIndex],
-        ...updates,
-        updated_at: new Date().toISOString()
-      }
-
-      existingSermons[sermonIndex] = updatedSermon
-      localStorage.setItem('sermons', JSON.stringify(existingSermons))
-
-      // Actualizar el estado local
-      setSermons(prev => prev.map(sermon => sermon.id === id ? updatedSermon : sermon))
-
-      return { data: updatedSermon, error: null }
-    } catch (err) {
-      console.error('Error updating sermon:', err)
-      return { data: null, error: err as Error }
-    }
-  }
-
-  const deleteSermon = async (id: string) => {
-    try {
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Obtener sermones del localStorage
-      const storedSermons = localStorage.getItem('sermons')
-      const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Filtrar el sermón a eliminar
-      const updatedSermons = existingSermons.filter(sermon => sermon.id !== id)
-      localStorage.setItem('sermons', JSON.stringify(updatedSermons))
-
-      // Actualizar el estado local
-      setSermons(prev => prev.filter(sermon => sermon.id !== id))
-
-      return { error: null }
-    } catch (err) {
-      console.error('Error deleting sermon:', err)
-      return { error: err as Error }
-    }
-  }
-
-  const incrementViewCount = async (id: string) => {
-    try {
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 200))
-
-      // Obtener sermones del localStorage
-      const storedSermons = localStorage.getItem('sermons')
-      const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Encontrar y actualizar el contador de vistas
-      const sermonIndex = existingSermons.findIndex(sermon => sermon.id === id)
-      if (sermonIndex !== -1) {
-        existingSermons[sermonIndex].view_count += 1
-        localStorage.setItem('sermons', JSON.stringify(existingSermons))
-
-        // Actualizar el estado local
-        setSermons(prev => prev.map(sermon => 
-          sermon.id === id 
-            ? { ...sermon, view_count: sermon.view_count + 1 }
-            : sermon
-        ))
-      }
-
-      return { error: null }
-    } catch (err) {
-      console.error('Error incrementing view count:', err)
-      return { error: err as Error }
-    }
-  }
-
-  const toggleLike = async (sermonId: string) => {
-    try {
-      if (!user) {
-        return { error: { message: 'Debes iniciar sesión para dar like' } as Error }
-      }
-
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      // Obtener likes del localStorage
-      const storedLikes = localStorage.getItem('sermon_likes')
-      const existingLikes: { userId: string; sermonId: string }[] = storedLikes ? JSON.parse(storedLikes) : []
-
-      // Verificar si ya existe el like
-      const likeIndex = existingLikes.findIndex(like => like.userId === user.id && like.sermonId === sermonId)
-      const hasLike = likeIndex !== -1
-
-      // Obtener sermones del localStorage
-      const storedSermons = localStorage.getItem('sermons')
-      const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Encontrar el sermón
-      const sermonIndex = existingSermons.findIndex(sermon => sermon.id === sermonId)
-      if (sermonIndex === -1) {
-        throw new Error('Sermón no encontrado')
-      }
-
-      if (hasLike) {
-        // Quitar like
-        existingLikes.splice(likeIndex, 1)
-        existingSermons[sermonIndex].like_count = Math.max(0, existingSermons[sermonIndex].like_count - 1)
-      } else {
-        // Agregar like
-        existingLikes.push({ userId: user.id, sermonId })
-        existingSermons[sermonIndex].like_count += 1
-      }
-
-      // Guardar cambios
-      localStorage.setItem('sermon_likes', JSON.stringify(existingLikes))
-      localStorage.setItem('sermons', JSON.stringify(existingSermons))
-
-      // Actualizar estado local
-      setSermons(prev => prev.map(sermon => 
-        sermon.id === sermonId 
-          ? { ...sermon, like_count: existingSermons[sermonIndex].like_count }
-          : sermon
-      ))
-
-      return { error: null }
-    } catch (err) {
-      console.error('Error toggling like:', err)
-      return { error: err as Error }
-    }
-  }
-
-  const refreshSermons = async () => {
-    await fetchSermons()
-  }
-
-  const searchSermons = async (query: string) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      // Obtener sermones del localStorage o usar datos por defecto
-      const storedSermons = localStorage.getItem('sermons')
-      let allSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Filtrar por query de búsqueda
-      const filteredSermons = allSermons.filter(sermon => 
-        sermon.title.toLowerCase().includes(query.toLowerCase()) ||
-        (sermon.description && sermon.description.toLowerCase().includes(query.toLowerCase())) ||
-        sermon.preacher.toLowerCase().includes(query.toLowerCase()) ||
-        (sermon.tags && sermon.tags.some((tag: string) => tag.toLowerCase().includes(query.toLowerCase())))
-      )
-
-      // Aplicar otros filtros si existen
-      let finalSermons = [...filteredSermons]
-
-      if (options?.published !== undefined) {
-        finalSermons = finalSermons.filter(sermon => sermon.is_published === options.published)
-      }
-
-      if (options?.speaker) {
-        finalSermons = finalSermons.filter(sermon => sermon.preacher === options.speaker)
-      }
-
-      if (options?.category) {
-        finalSermons = finalSermons.filter(sermon => sermon.category_id === options.category)
-      }
-
-      if (options?.featured !== undefined) {
-        finalSermons = finalSermons.filter(sermon => sermon.is_featured === options.featured)
-      }
-
-      // Ordenar por fecha de sermón (más reciente primero)
-      finalSermons.sort((a, b) => new Date(b.preached_at).getTime() - new Date(a.preached_at).getTime())
-
-      // Aplicar límite
-      if (options?.limit) {
-        finalSermons = finalSermons.slice(0, options.limit)
-      }
-
-      setSermons(finalSermons)
-      setHasMore(finalSermons.length >= (options?.limit || 10))
-    } catch (err) {
-      setError('Error al buscar sermones')
-      console.error('Error in searchSermons:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadMore = async () => {
-    if (!hasMore || loading) return
-
-    try {
-      setLoading(true)
-      
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      // Obtener sermones del localStorage o usar datos por defecto
-      const storedSermons = localStorage.getItem('sermons')
-      let allSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-      // Aplicar filtros
-      let filteredSermons = [...allSermons]
-
-      if (options?.published !== undefined) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.is_published === options.published)
-      }
-
-      if (options?.speaker) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.preacher === options.speaker)
-      }
-
-      if (options?.category) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.category_id === options.category)
-      }
-
-      if (options?.featured !== undefined) {
-        filteredSermons = filteredSermons.filter(sermon => sermon.is_featured === options.featured)
-      }
-
-      // Ordenar por fecha de sermón (más reciente primero)
-      filteredSermons.sort((a, b) => new Date(b.preached_at).getTime() - new Date(a.preached_at).getTime())
-
-      // Obtener los siguientes elementos
-      const currentLength = sermons.length
-      const nextBatch = filteredSermons.slice(currentLength, currentLength + 10)
-
-      if (nextBatch.length > 0) {
-        setSermons(prev => [...prev, ...nextBatch])
-        setHasMore(currentLength + nextBatch.length < filteredSermons.length)
-      } else {
-        setHasMore(false)
-      }
-    } catch (err) {
-      setError('Error al cargar más sermones')
-      console.error('Error in loadMore:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return {
-    sermons,
-    loading,
-    error,
-    hasMore,
-    createSermon,
-    updateSermon,
-    deleteSermon,
-    getSermonBySlug: async (slug: string): Promise<{ data: Sermon | null; error: Error | null }> => {
+    const fetchSermons = async () => {
       try {
-        // Simular delay de red
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        // Obtener sermones del localStorage
-        const storedSermons = localStorage.getItem('sermons')
-        const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-        // Buscar el sermón por slug
-        const sermon = existingSermons.find(s => s.slug === slug)
-        
-        if (!sermon) {
-          return { data: null, error: new Error('Sermón no encontrado') }
-        }
-
-        return { data: sermon, error: null }
+        setLoading(true)
+        const data = await sermonsService.getAll(page, limit)
+        setSermons(data)
+        setError(null)
       } catch (err) {
-        console.error('Error getting sermon by slug:', err)
-        return { data: null, error: err instanceof Error ? err : new Error('Unknown error') }
+        setError(err instanceof Error ? err.message : 'Error al cargar sermones')
+      } finally {
+        setLoading(false)
       }
-    },
-    incrementViewCount,
-    toggleLike,
-    refreshSermons,
-    fetchSermons,
-    searchSermons,
-    loadMore
-  }
+    }
+
+    fetchSermons()
+  }, [page, limit])
+
+  return { sermons, loading, error }
 }
 
-// Hook específico para obtener un sermón por slug
+// Hook para obtener un sermón específico por slug
 export const useSermon = (slug: string) => {
-  const [sermon, setSermon] = useState<Sermon | null>(null)
+  const [sermon, setSermon] = useState<SermonWithRelations | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -469,26 +50,16 @@ export const useSermon = (slug: string) => {
 
       try {
         setLoading(true)
+        const data = await sermonsService.getBySlug(slug)
+        setSermon(data)
         setError(null)
-
-        // Simular delay de red
-        await new Promise(resolve => setTimeout(resolve, 300))
-
-        // Obtener sermones del localStorage
-        const storedSermons = localStorage.getItem('sermons')
-        const existingSermons: Sermon[] = storedSermons ? JSON.parse(storedSermons) : getDefaultSermons()
-
-        // Buscar el sermón por slug
-        const foundSermon = existingSermons.find(s => s.slug === slug)
-
-        if (!foundSermon) {
-          setError('Sermón no encontrado')
-        } else {
-          setSermon(foundSermon)
+        
+        // Incrementar contador de vistas
+        if (data?.id) {
+          await sermonsService.incrementViews(data.id)
         }
       } catch (err) {
-        setError('Error al cargar sermón')
-        console.error('Error fetching sermon:', err)
+        setError(err instanceof Error ? err.message : 'Error al cargar el sermón')
       } finally {
         setLoading(false)
       }
@@ -500,67 +71,21 @@ export const useSermon = (slug: string) => {
   return { sermon, loading, error }
 }
 
-// Hook para sermones destacados
-export const useFeaturedSermons = (limit: number = 3) => {
-  return useSermons({
-    published: true,
-    featured: true,
-    limit
-  })
-}
-
-// Hook para sermones recientes
-export const useRecentSermons = (limit: number = 6) => {
-  return useSermons({
-    published: true,
-    limit
-  })
-}
-
-// Hook para sermones por predicador
-export const useSermonsBySpeaker = (speaker: string) => {
-  return useSermons({
-    published: true,
-    speaker
-  })
-}
-
-// Hook para categorías de sermones
+// Hook para obtener categorías de sermones
 export const useSermonCategories = () => {
-  const [categories, setCategories] = useState<{ id: string; name: string; description?: string }[]>([])
+  const [categories, setCategories] = useState<SermonCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const getDefaultCategories = () => [
-    { id: 'cat1', name: 'Doctrina', description: 'Enseñanzas fundamentales de la fe cristiana' },
-    { id: 'cat2', name: 'Vida Cristiana', description: 'Cómo vivir como cristiano en el día a día' },
-    { id: 'cat3', name: 'Evangelismo', description: 'Compartiendo el evangelio con otros' },
-    { id: 'cat4', name: 'Familia', description: 'Principios bíblicos para la familia' },
-    { id: 'cat5', name: 'Juventud', description: 'Mensajes dirigidos a los jóvenes' }
-  ]
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         setLoading(true)
+        const data = await sermonCategoriesService.getAll({ active: true })
+        setCategories(data)
         setError(null)
-
-        // Simular delay de red
-        await new Promise(resolve => setTimeout(resolve, 200))
-
-        // Obtener categorías del localStorage o usar datos por defecto
-        const storedCategories = localStorage.getItem('sermon_categories')
-        const existingCategories = storedCategories ? JSON.parse(storedCategories) : getDefaultCategories()
-
-        // Guardar en localStorage si no existían
-        if (!storedCategories) {
-          localStorage.setItem('sermon_categories', JSON.stringify(existingCategories))
-        }
-
-        setCategories(existingCategories)
       } catch (err) {
-        setError('Error al cargar categorías')
-        console.error('Error fetching categories:', err)
+        setError(err instanceof Error ? err.message : 'Error al cargar categorías')
       } finally {
         setLoading(false)
       }
@@ -570,4 +95,459 @@ export const useSermonCategories = () => {
   }, [])
 
   return { categories, loading, error }
+}
+
+// Hook para obtener series de sermones
+export const useSermonSeries = () => {
+  const [series, setSeries] = useState<SermonSeries[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchSeries = async () => {
+      try {
+        setLoading(true)
+        const data = await sermonSeriesService.getActive()
+        setSeries(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar series')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSeries()
+  }, [])
+
+  return { series, loading, error }
+}
+
+// Hook para obtener recursos de un sermón
+export const useSermonResources = (sermonId: string) => {
+  const [resources, setResources] = useState<SermonResource[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchResources = async () => {
+      if (!sermonId) return
+
+      try {
+        setLoading(true)
+        const data = await sermonResourcesService.getBySermonId(sermonId)
+        setResources(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar recursos')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchResources()
+  }, [sermonId])
+
+  return { resources, loading, error }
+}
+
+// Hook para obtener sermones destacados
+export const useFeaturedSermons = (limit = 5) => {
+  const [sermons, setSermons] = useState<Sermon[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchFeaturedSermons = async () => {
+      try {
+        setLoading(true)
+        const data = await sermonsService.getFeatured(limit)
+        setSermons(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar sermones destacados')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFeaturedSermons()
+  }, [limit])
+
+  return { sermons, loading, error }
+}
+
+// Hook para buscar sermones
+export const useSermonSearch = () => {
+  const [results, setResults] = useState<Sermon[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const search = async (query: string, page = 1, limit = 10) => {
+    if (!query.trim()) {
+      setResults([])
+      return
+    }
+
+    try {
+      setLoading(true)
+      const data = await sermonsService.search(query, page, limit)
+      setResults(data)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error en la búsqueda')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const clearSearch = () => {
+    setResults([])
+    setError(null)
+  }
+
+  return { results, loading, error, search, clearSearch }
+}
+
+// Hook para filtrar sermones
+export const useSermonFilters = (
+  filters: {
+    category?: string
+    series?: string
+    speaker?: string
+    hasTranscript?: boolean
+    hasVideo?: boolean
+    hasAudio?: boolean
+    tags?: string[]
+    dateRange?: { start?: string; end?: string }
+  } = {},
+  searchTerm = '',
+  sortBy = 'created_at',
+  sortOrder = 'desc'
+) => {
+  const [sermons, setSermons] = useState<SermonWithRelations[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Memoize the service filters to prevent unnecessary re-renders
+  const serviceFilters = useMemo(() => ({
+    categoryId: filters.category,
+    seriesId: filters.series,
+    speaker: filters.speaker,
+    hasTranscript: filters.hasTranscript,
+    hasVideo: filters.hasVideo,
+    hasAudio: filters.hasAudio,
+    tags: filters.tags,
+    dateFrom: filters.dateRange?.start,
+    dateTo: filters.dateRange?.end
+  }), [
+    filters.category,
+    filters.series,
+    filters.speaker,
+    filters.hasTranscript,
+    filters.hasVideo,
+    filters.hasAudio,
+    filters.tags,
+    filters.dateRange?.start,
+    filters.dateRange?.end
+  ])
+
+  useEffect(() => {
+    const fetchSermons = async () => {
+      try {
+        setLoading(true)
+
+        let data: SermonWithRelations[]
+        
+        if (searchTerm) {
+          // Use search if there's a search term
+          data = await sermonsService.search(searchTerm, 1, 50) // Increase limit for search
+        } else {
+          // Check if any filters are active
+          const hasActiveFilters = serviceFilters.categoryId || serviceFilters.seriesId || 
+            serviceFilters.speaker || serviceFilters.hasTranscript !== undefined || 
+            serviceFilters.hasVideo !== undefined || serviceFilters.hasAudio !== undefined || 
+            serviceFilters.tags?.length || serviceFilters.dateFrom || serviceFilters.dateTo;
+          
+          if (hasActiveFilters) {
+            // Use filters if any are active
+            data = await sermonsService.getWithFilters(serviceFilters, 1, 50)
+          } else {
+            // Use getAll if no filters are active
+            data = await sermonsService.getAll(1, 50)
+          }
+        }
+        
+        // Apply sorting
+        data.sort((a, b) => {
+          let aValue: any, bValue: any
+          
+          switch (sortBy) {
+            case 'title':
+              aValue = a.title
+              bValue = b.title
+              break
+            case 'view_count':
+              aValue = a.view_count || 0
+              bValue = b.view_count || 0
+              break
+            case 'likes_count':
+              aValue = a.like_count || 0
+              bValue = b.like_count || 0
+              break
+            default:
+              aValue = a.created_at
+              bValue = b.created_at
+          }
+          
+          if (sortOrder === 'asc') {
+            return aValue > bValue ? 1 : -1
+          } else {
+            return aValue < bValue ? 1 : -1
+          }
+        })
+        
+        setSermons(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar sermones')
+        setSermons([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSermons()
+  }, [serviceFilters, searchTerm, sortBy, sortOrder])
+
+  return { sermons, loading, error }
+}
+
+// Hook para obtener sermones por categoría
+export const useSermonsByCategory = (categoryId: string, page = 1, limit = 10) => {
+  const [sermons, setSermons] = useState<Sermon[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchSermons = async () => {
+      if (!categoryId) return
+
+      try {
+        setLoading(true)
+        const data = await sermonsService.getByCategory(categoryId, page, limit)
+        setSermons(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar sermones')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSermons()
+  }, [categoryId, page, limit])
+
+  return { sermons, loading, error }
+}
+
+// Hook para obtener sermones por serie
+export const useSermonsBySeries = (seriesId: string, page = 1, limit = 10) => {
+  const [sermons, setSermons] = useState<Sermon[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchSermons = async () => {
+      if (!seriesId) return
+
+      try {
+        setLoading(true)
+        const data = await sermonsService.getBySeries(seriesId, page, limit)
+        setSermons(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar sermones')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSermons()
+  }, [seriesId, page, limit])
+
+  return { sermons, loading, error }
+}
+
+// Hook para obtener sermones por predicador
+export const useSermonsBySpeaker = (speaker: string, page = 1, limit = 10) => {
+  const [sermons, setSermons] = useState<Sermon[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchSermons = async () => {
+      if (!speaker) return
+
+      try {
+        setLoading(true)
+        const data = await sermonsService.getBySpeaker(speaker, page, limit)
+        setSermons(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar sermones')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSermons()
+  }, [speaker, page, limit])
+
+  return { sermons, loading, error }
+}
+
+// Hook para obtener predicadores únicos
+export const useSpeakers = () => {
+  const [speakers, setSpeakers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchSpeakers = async () => {
+      try {
+        setLoading(true)
+        const data = await sermonsService.getSpeakers()
+        setSpeakers(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar predicadores')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSpeakers()
+  }, [])
+
+  return { speakers, loading, error }
+}
+
+// Hook para manejar interacciones de sermones
+export const useSermonInteractions = (sermonId?: string) => {
+  const [liked, setLiked] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [interactions, setInteractions] = useState<any[]>([])
+
+  // Cargar interacciones cuando se proporciona sermonId
+  useEffect(() => {
+    if (sermonId) {
+      loadInteractions()
+    }
+  }, [sermonId])
+
+  const loadInteractions = async () => {
+    if (!sermonId) return
+    
+    try {
+      const data = await sermonInteractionsService.getBySermonId(sermonId)
+      setInteractions(data || [])
+    } catch (err) {
+      console.error('Error al cargar interacciones:', err)
+    }
+  }
+
+  const toggleLike = async (targetSermonId: string, userId?: string) => {
+    try {
+      setLoading(true)
+      
+      if (liked) {
+        // Remover like (implementar lógica de eliminación)
+        setLiked(false)
+      } else {
+        // Agregar like
+        await sermonInteractionsService.create({
+          sermon_id: targetSermonId,
+          user_id: userId || 'anonymous',
+          type: 'like'
+        })
+        
+        // Incrementar contador de likes en el sermón
+        await sermonsService.incrementLikes(targetSermonId)
+        setLiked(true)
+      }
+      
+      // Recargar interacciones
+      await loadInteractions()
+    } catch (err) {
+      console.error('Error al manejar like:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const incrementLikes = async () => {
+    if (!sermonId) return
+    
+    try {
+      await sermonsService.incrementLikes(sermonId)
+      await loadInteractions()
+    } catch (err) {
+      console.error('Error al incrementar likes:', err)
+    }
+  }
+
+  const addComment = async (content: string, userId?: string) => {
+    if (!sermonId) return
+    
+    try {
+      await sermonInteractionsService.create({
+        sermon_id: sermonId,
+        user_id: userId || 'anonymous',
+        type: 'comment',
+        content
+      })
+      
+      // Incrementar contador de comentarios
+      await sermonsService.incrementComments(sermonId)
+      await loadInteractions()
+    } catch (err) {
+      console.error('Error al agregar comentario:', err)
+    }
+  }
+
+  return { 
+    liked, 
+    loading, 
+    interactions,
+    toggleLike, 
+    incrementLikes,
+    addComment
+  }
+}
+
+// Hook para obtener estadísticas de sermones
+export const useSermonStats = () => {
+  const [stats, setStats] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true)
+        const data = await sermonsService.getStats()
+        setStats(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar estadísticas')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
+  return { stats, loading, error }
 }

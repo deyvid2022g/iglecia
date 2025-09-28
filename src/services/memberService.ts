@@ -1,28 +1,27 @@
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/database';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
-type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
-type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+type Profile = Database['public']['Tables']['users']['Row'];
+type ProfileInsert = Database['public']['Tables']['users']['Insert'];
+type ProfileUpdate = Database['public']['Tables']['users']['Update'];
 
-type Ministry = Database['public']['Tables']['ministries']['Row'];
 type MinistryInsert = Database['public']['Tables']['ministries']['Insert'];
 type MinistryUpdate = Database['public']['Tables']['ministries']['Update'];
 
-type MinistryMember = Database['public']['Tables']['ministry_members']['Row'];
 type MinistryMemberInsert = Database['public']['Tables']['ministry_members']['Insert'];
 type MinistryMemberUpdate = Database['public']['Tables']['ministry_members']['Update'];
 
-type AgeGroup = Database['public']['Tables']['age_groups']['Row'];
 type AgeGroupInsert = Database['public']['Tables']['age_groups']['Insert'];
 type AgeGroupUpdate = Database['public']['Tables']['age_groups']['Update'];
+
+
 
 // Servicios para Perfiles de Miembros
 export const profileService = {
   // Obtener todos los perfiles
   async getProfiles() {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -33,7 +32,7 @@ export const profileService = {
   // Obtener perfil por ID
   async getProfileById(id: string) {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
       .eq('id', id)
       .single();
@@ -45,9 +44,9 @@ export const profileService = {
   // Obtener perfil por user_id
   async getProfileByUserId(userId: string) {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
-      .eq('user_id', userId)
+      .eq('id', userId)
       .single();
 
     if (error) throw error;
@@ -57,7 +56,7 @@ export const profileService = {
   // Crear nuevo perfil
   async createProfile(profile: ProfileInsert) {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .insert(profile)
       .select()
       .single();
@@ -69,7 +68,7 @@ export const profileService = {
   // Actualizar perfil
   async updateProfile(id: string, updates: ProfileUpdate) {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .update(updates)
       .eq('id', id)
       .select()
@@ -82,7 +81,7 @@ export const profileService = {
   // Eliminar perfil
   async deleteProfile(id: string) {
     const { error } = await supabase
-      .from('profiles')
+      .from('users')
       .delete()
       .eq('id', id);
 
@@ -92,10 +91,10 @@ export const profileService = {
   // Buscar perfiles por nombre
   async searchProfiles(searchTerm: string) {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
-      .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
-      .order('first_name');
+      .or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+      .order('full_name');
 
     if (error) throw error;
     return data;
@@ -391,9 +390,7 @@ export const memberUtils = {
 
   // Obtener nombre completo del perfil
   getFullName(profile: Profile): string {
-    const firstName = profile.first_name || '';
-    const lastName = profile.last_name || '';
-    return `${firstName} ${lastName}`.trim() || 'Sin nombre';
+    return profile.full_name || 'Sin nombre';
   },
 
   // Formatear teléfono

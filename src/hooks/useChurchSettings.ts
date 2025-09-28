@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { type ChurchSetting, type ServiceSchedule, type OfficeHours, type SpecialDate, type ChurchFacility, type FacilityBooking } from '../lib/supabase';
+import { supabase, type ChurchSetting, type ServiceSchedule, type OfficeHours, type SpecialDate, type ChurchFacility, type FacilityBooking } from '../lib/supabase';
 
 // Definición del tipo SystemNotification
 type SystemNotification = {
@@ -468,7 +468,7 @@ export function useFacilityBookings() {
         .select(`
           *,
           facility:church_facilities(*),
-          booked_by_profile:profiles(*)
+          booked_by_profile:users(*)
         `)
         .order('start_datetime');
 

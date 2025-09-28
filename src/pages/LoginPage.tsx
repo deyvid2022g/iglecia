@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, ArrowLeft } from 'lucide-react';
 
 export function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -128,6 +128,17 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
+        {/* Botón de regreso a inicio */}
+        <div className="flex justify-start mb-4">
+          <Link 
+            to="/" 
+            className="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors duration-200 group"
+          >
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-200" />
+            <span className="text-sm font-medium">Volver a inicio</span>
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="text-center">
           <Link to="/" className="inline-flex items-center space-x-3 mb-8">

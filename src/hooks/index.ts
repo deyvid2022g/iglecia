@@ -1,6 +1,5 @@
 // Hooks de autenticación
 export {
-  useAuth,
   usePermissions
 } from './useAuth';
 
